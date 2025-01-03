@@ -167,6 +167,10 @@ npm run dev
 
 ## 프로젝트 구조
 
+### Clean Architecture (Hexagonal Architecture)
+
+각 MCP 서버는 **클린 아키텍처(포트 & 어댑터 패턴)**를 적용하여 도메인 로직과 인프라를 분리합니다.
+
 ```
 mcp-monkeys/
 ├── shared/                      # 공통 DTO 및 유틸리티
@@ -176,35 +180,43 @@ mcp-monkeys/
 │   ├── dto/                     # Structured Output DTO
 │   └── service/                 # 비즈니스 로직
 ├── mcp-library-server/          # 도서관리 MCP 서버
-│   ├── entity/                  # Book, Author, Loan
-│   ├── repository/              # JPA Repository
-│   ├── service/                 # LibraryService, LibraryMcpService
-│   └── resources/
-│       ├── schema.sql           # DDL
-│       └── data.sql             # 초기 데이터
 ├── mcp-todo-server/             # 할일관리 MCP 서버
-│   ├── entity/                  # TodoList, Todo, Tag
-│   ├── repository/              # JPA Repository
-│   ├── service/                 # TodoService, TodoMcpService
-│   └── resources/
-│       ├── schema.sql           # DDL
-│       └── data.sql             # 초기 데이터
 ├── mcp-employee-server/         # 직원관리 MCP 서버
-│   ├── entity/                  # Department, Employee, Position
-│   ├── repository/              # JPA Repository
-│   ├── service/                 # EmployeeService, EmployeeMcpService
-│   └── resources/
-│       ├── schema.sql           # DDL
-│       └── data.sql             # 초기 데이터
 ├── mcp-product-server/          # 상품관리 MCP 서버
-│   ├── entity/                  # Category, Product, Inventory
-│   ├── repository/              # JPA Repository
-│   ├── service/                 # ProductService, ProductMcpService
-│   └── resources/
-│       ├── schema.sql           # DDL
-│       └── data.sql             # 초기 데이터
 └── mcp-front/                   # React 프론트엔드
 ```
+
+### MCP 서버 내부 구조 (Clean Architecture)
+
+```
+mcp-{server}/
+├── adapter/
+│   ├── in/mcp/                  # MCP 입력 어댑터
+│   │   ├── {Domain}McpAdapter.kt
+│   │   └── dto/                 # 응답 DTO
+│   └── outbound/persistence/    # 영속성 출력 어댑터
+│       ├── entity/              # JPA 엔티티
+│       ├── repository/          # JPA Repository
+│       └── adapter/             # Repository 구현체
+├── application/
+│   ├── port/
+│   │   ├── in/                  # UseCase 인터페이스 (입력 포트)
+│   │   └── outbound/            # Repository 인터페이스 (출력 포트)
+│   └── service/                 # UseCase 구현체
+├── domain/model/                # 순수 도메인 모델 (JPA 의존성 없음)
+├── config/                      # Spring 설정
+└── resources/
+    ├── schema.sql               # DDL
+    └── data.sql                 # 초기 데이터
+```
+
+### 아키텍처 레이어
+
+| 레이어 | 역할 | 의존 방향 |
+|--------|------|-----------|
+| **Domain** | 순수 비즈니스 로직, 엔티티 | 없음 (최내부) |
+| **Application** | UseCase, Port 정의 | Domain만 의존 |
+| **Adapter** | MCP/REST, JPA 구현체 | Application 의존 |
 
 ## 기술 스택
 
@@ -224,32 +236,46 @@ mcp-monkeys/
 | **Frontend** | React + TypeScript | 18.x |
 | **Build Tool** | Gradle | 8.14 |
 
-## Spring AI 2.0 MCP 도구 정의
+## Spring AI 2.0 MCP 도구 정의 (Clean Architecture)
 
 ```kotlin
-@Service
-@Transactional(readOnly = true)
-class LibraryMcpService(
-    private val libraryService: LibraryService
+// MCP 입력 어댑터 - adapter/in/mcp/
+@Component
+class LibraryMcpAdapter(
+    private val bookUseCase: BookUseCase,
+    private val loanUseCase: LoanUseCase
 ) {
     @Tool(description = "도서를 검색합니다. 제목, 저자명, ISBN으로 검색 가능합니다.")
     fun searchBooks(
-        @ToolParam(description = "검색 키워드 (제목, 저자명, ISBN)")
-        keyword: String
-    ): List<BookInfo> {
-        return libraryService.searchBooks(keyword).map { it.toInfo() }
-    }
+        @ToolParam(description = "검색 키워드") keyword: String
+    ): List<BookDto> =
+        bookUseCase.searchBooks(keyword).map { BookDto.fromDomain(it) }
 
     @Tool(description = "도서를 대출합니다.")
-    @Transactional
     fun borrowBook(
         @ToolParam(description = "도서 ISBN") isbn: String,
         @ToolParam(description = "대출자 이름") borrowerName: String,
         @ToolParam(description = "대출자 이메일") borrowerEmail: String
-    ): LoanResult {
-        // ...
+    ): LoanResultDto {
+        val loan = loanUseCase.borrowBook(isbn, borrowerName, borrowerEmail)
+        return LoanResultDto.fromDomain(loan)
     }
 }
+
+// UseCase 인터페이스 - application/port/in/
+interface BookUseCase {
+    fun searchBooks(keyword: String): List<Book>
+    fun findByIsbn(isbn: String): Book?
+}
+
+// 도메인 모델 - domain/model/
+data class Book(
+    val id: Long = 0,
+    val isbn: String,
+    val title: String,
+    val author: Author,
+    val status: BookStatus = BookStatus.AVAILABLE
+)
 ```
 
 ## 데이터베이스 설정
