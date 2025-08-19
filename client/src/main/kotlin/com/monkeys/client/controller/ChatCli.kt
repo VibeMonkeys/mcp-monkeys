@@ -21,8 +21,14 @@ class ChatCli(private val mcpService: McpService) {
             print("You: ")
             val userInput = readlnOrNull()
 
-            if (userInput.isNullOrBlank() || userInput.equals("exit", ignoreCase = true) || userInput.equals("quit", ignoreCase = true)) {
-                break
+                        when {
+                userInput.isNullOrBlank() -> continue
+                userInput.equals("exit", ignoreCase = true) || userInput.equals("quit", ignoreCase = true) -> break
+                userInput.equals("/clear", ignoreCase = true) -> {
+                    conversationHistory.clear()
+                    println("${ANSI_YELLOW}대화 기록이 초기화되었습니다.${ANSI_RESET}")
+                    continue
+                }
             }
 
             when {
