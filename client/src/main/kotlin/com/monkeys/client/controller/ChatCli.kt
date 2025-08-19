@@ -11,7 +11,7 @@ class ChatCli(private val mcpService: McpService) {
     @EventListener(ApplicationReadyEvent::class)
     fun startChat() {
         println("==================================================")
-        println("MCP 대화형 클라이언트를 시작합니다.")
+        println("MCP 대화형 클라이언트를 시작합니다. (현재: ${java.time.LocalDate.now()})")
         println("궁금한 것을 물어보세요. (종료하려면 'exit' 또는 'quit' 입력)")
         println("==================================================")
 
