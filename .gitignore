@@ -1,0 +1,19 @@
+# macOS
+.DS_Store
+
+# IntelliJ IDEA
+.idea/
+*.iml
+
+# Gradle
+.gradle/
+build/
+
+# Build-related
+out/
+
+# Log files
+*.log
+
+# Local secret properties
+application-local.properties
