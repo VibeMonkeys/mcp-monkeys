@@ -3,6 +3,7 @@ package com.monkeys.client.client
 import com.monkeys.client.dto.ChatRequest
 import com.monkeys.client.dto.ChatResponse
 import com.monkeys.client.dto.ServerData
+import com.monkeys.client.dto.ChatMessageDto
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Component
 import org.springframework.web.reactive.function.client.WebClient
@@ -35,5 +36,26 @@ class McpServerClient(
             .bodyValue(request)
             .retrieve()
             .bodyToMono(ChatResponse::class.java)
+    }
+
+    /**
+     * MCP 서버의 채팅 기록을 지웁니다.
+     */
+    fun clearChatHistory(): Mono<Void> {
+        return webClient.delete()
+            .uri("/api/history")
+            .retrieve()
+            .bodyToMono(Void::class.java)
+    }
+
+    /**
+     * MCP 서버로부터 채팅 기록을 가져옵니다.
+     */
+    fun getChatHistory(): Mono<List<ChatMessageDto>> {
+        return webClient.get()
+            .uri("/api/history")
+            .retrieve()
+            .bodyToFlux(ChatMessageDto::class.java)
+            .collectList()
     }
 }

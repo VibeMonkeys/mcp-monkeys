@@ -1,3 +1,3 @@
 package com.monkeys.client.dto
 
-data class ChatRequest(val prompt: String)
+data class ChatRequest(val userInput: String)
