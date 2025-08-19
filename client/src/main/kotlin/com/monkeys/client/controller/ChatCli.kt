@@ -23,20 +23,20 @@ class ChatCli(private val mcpService: McpService) {
 
                         when {
                 userInput.isNullOrBlank() -> continue
-                userInput.equals("exit", ignoreCase = true) || userInput.equals("quit", ignoreCase = true) -> break
+                                userInput.equals("/clear", ignoreCase = true) || userInput.equals("quit", ignoreCase = true) -> break
                 userInput.equals("/clear", ignoreCase = true) -> {
                     conversationHistory.clear()
                     println("${ANSI_YELLOW}대화 기록이 초기화되었습니다.${ANSI_RESET}")
                     continue
                 }
-            }
-
-            when {
-                userInput.isNullOrBlank() -> continue
-                userInput.equals("exit", ignoreCase = true) || userInput.equals("quit", ignoreCase = true) -> break
-                userInput.equals("/clear", ignoreCase = true) -> {
-                    conversationHistory.clear()
-                    println("대화 기록이 초기화되었습니다.")
+                userInput.equals("/history", ignoreCase = true) -> {
+                    if (conversationHistory.isEmpty()) {
+                        println("${ANSI_YELLOW}아직 대화 기록이 없습니다.${ANSI_RESET}")
+                    } else {
+                        println("${ANSI_YELLOW}--- 대화 기록 시작 ---${ANSI_RESET}")
+                        conversationHistory.forEach { println(it) }
+                        println("${ANSI_YELLOW}--- 대화 기록 끝 ---${ANSI_RESET}")
+                    }
                     continue
                 }
             }
