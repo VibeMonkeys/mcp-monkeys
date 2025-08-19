@@ -29,7 +29,7 @@ class ChatCli(private val mcpService: McpService) {
                     println("${ANSI_YELLOW}대화 기록이 초기화되었습니다.${ANSI_RESET}")
                     continue
                 }
-                userInput.equals("/history", ignoreCase = true) -> {
+                                userInput.equals("/history", ignoreCase = true) -> {
                     if (conversationHistory.isEmpty()) {
                         println("${ANSI_YELLOW}아직 대화 기록이 없습니다.${ANSI_RESET}")
                     } else {
@@ -39,6 +39,18 @@ class ChatCli(private val mcpService: McpService) {
                     }
                     continue
                 }
+                userInput.equals("/help", ignoreCase = true) -> {
+                    println("${ANSI_YELLOW}--- 사용 가능한 명령어 ---${ANSI_RESET}")
+                    println("${ANSI_YELLOW}/clear: 대화 기록을 초기화합니다.${ANSI_RESET}")
+                    println("${ANSI_YELLOW}/history: 현재 대화 기록을 표시합니다.${ANSI_RESET}")
+                    println("${ANSI_YELLOW}/help: 사용 가능한 명령어를 표시합니다.${ANSI_RESET}")
+                    println("${ANSI_YELLOW}exit/quit: 클라이언트를 종료합니다.${ANSI_RESET}")
+                    println("${ANSI_YELLOW}------------------------${ANSI_RESET}")
+                    continue
+                }
+            }
+
+            val thinkingMessage = "${ANSI_GREEN}Gemini: ...생각 중...${ANSI_RESET}"
             }
 
             val thinkingMessage = "Gemini: ...생각 중..."
