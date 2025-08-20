@@ -1,19 +1,114 @@
 # macOS
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
 
 # IntelliJ IDEA
 .idea/
 *.iml
+*.iws
+*.ipr
+
+# VSCode
+.vscode/
+.history/
 
 # Gradle
 .gradle/
 build/
+gradle-app.setting
+!gradle-wrapper.jar
+!gradle-wrapper.properties
 
-# Build-related
+# Kotlin/Java
+*.class
+*.jar
+*.war
+*.ear
+*.sar
+*.zip
+*.tar.gz
+*.rar
 out/
+target/
+
+# Spring Boot
+*.pid
+spring.log
+application-local.properties
+application-*.properties
+
+# H2 Database
+*.db
+*.mv.db
+*.trace.db
 
 # Log files
 *.log
+logs/
 
-# Local secret properties
-application-local.properties
+# Node.js & React Frontend (mcp-front/)
+mcp-front/node_modules/
+mcp-front/.npm
+mcp-front/.pnpm-debug.log*
+mcp-front/.yarn-integrity
+mcp-front/.yarn-error.log
+mcp-front/.yarnrc.yml
+mcp-front/.pnp.*
+
+# Build outputs
+mcp-front/dist/
+mcp-front/build/
+mcp-front/.next/
+mcp-front/out/
+
+# Environment files
+mcp-front/.env
+mcp-front/.env.local
+mcp-front/.env.development.local
+mcp-front/.env.test.local
+mcp-front/.env.production.local
+
+# Dependencies
+mcp-front/package-lock.json
+mcp-front/yarn.lock
+mcp-front/pnpm-lock.yaml
+
+# IDE and editors
+mcp-front/.vscode/
+mcp-front/.idea/
+mcp-front/*.swp
+mcp-front/*.swo
+
+# Testing
+mcp-front/coverage/
+mcp-front/.nyc_output/
+
+# ESLint
+mcp-front/.eslintcache
+
+# TypeScript
+mcp-front/*.tsbuildinfo
+
+# Misc
+mcp-front/.DS_Store
+mcp-front/*.tgz
+mcp-front/*.tar.gz
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+
+# Temporary folders
+tmp/
+temp/
