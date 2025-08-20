@@ -39,6 +39,7 @@ const mcpApi = {
       return response.ok;
     } catch {
       return false;
+    }
   }
 };
 
