@@ -1,0 +1,28 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: jira-mcp-server
+  ai:
+    openai:
+      api-key: dummy-key
+
+jira:
+  url: ${JIRA_URL:https://your-domain.atlassian.net}
+  email: ${JIRA_EMAIL:dummy@email.com}
+  token: ${JIRA_TOKEN:dummy-token}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    com.monkeys.jira: DEBUG
+    org.springframework.ai: INFO
