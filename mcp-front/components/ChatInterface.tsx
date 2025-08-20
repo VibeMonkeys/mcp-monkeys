@@ -40,7 +40,7 @@ const mcpApi = {
     } catch {
       return false;
     }
-  }
+  },
 };
 
 export function ChatInterface() {

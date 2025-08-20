@@ -8,7 +8,7 @@ import org.slf4j.LoggerFactory
 
 @RestController
 @RequestMapping("/api")
-@CrossOrigin(origins = ["http://localhost:3003"]) // React 개발 서버용
+@CrossOrigin(origins = ["http://localhost:3004"]) // React 개발 서버용
 class UnifiedChatController(
     private val chatClient: ChatClient,
     private val unifiedMcpService: UnifiedMcpService
