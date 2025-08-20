@@ -11,10 +11,10 @@ import com.fasterxml.jackson.module.kotlin.readValue
 
 @Service
 class UnifiedMcpService(
-    @Value("\${mcp.github.url:http://localhost:8082}") private val githubUrl: String,
-    @Value("\${mcp.jira.url:http://localhost:8083}") private val jiraUrl: String,
-    @Value("\${mcp.gmail.url:http://localhost:8084}") private val gmailUrl: String,
-    @Value("\${mcp.slack.url:http://localhost:8085}") private val slackUrl: String
+    @Value("\${mcp.github.url:http://localhost:8092}") private val githubUrl: String,
+    @Value("\${mcp.jira.url:http://localhost:8093}") private val jiraUrl: String,
+    @Value("\${mcp.gmail.url:http://localhost:8094}") private val gmailUrl: String,
+    @Value("\${mcp.slack.url:http://localhost:8095}") private val slackUrl: String
 ) {
     private val client = OkHttpClient()
     private val mapper = jacksonObjectMapper()

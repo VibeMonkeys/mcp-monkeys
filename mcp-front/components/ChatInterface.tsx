@@ -9,25 +9,36 @@ import { toast } from "sonner";
 import { motion } from "motion/react";
 import { Server, Zap, Clock } from "lucide-react";
 
-// Mock API functions - 실제 Spring Boot 백엔드와 연동 시 대체해야 함
-const mockApi = {
+// MCP API 연동 함수들
+const mcpApi = {
   sendMessage: async (content: string): Promise<string> => {
-    await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
-    
-    const responses = [
-      "MCP 서버에서 요청을 성공적으로 처리했습니다. 연결 상태가 안정적이며 모든 시스템이 정상 작동 중입니다.",
-      "데이터베이스 쿼리가 완료되었습니다. 총 1,247개의 레코드를 확인했으며, 최신 데이터로 업데이트되어 있습니다.",
-      "API 엔드포인트 테스트 결과: 응답 시간 45ms, 상태 코드 200. 모든 기능이 정상적으로 작동합니다.",
-      "보안 검사를 완료했습니다. 인증 토큰이 유효하며, 접근 권한이 확인되었습니다.",
-      `"${content}"에 대한 분석을 완료했습니다. 추가적인 정보나 도움이 필요하시면 언제든 말씀해주세요.`
-    ];
-    
-    return responses[Math.floor(Math.random() * responses.length)];
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ message: content })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.text();
+      return data;
+    } catch (error) {
+      console.error('MCP API 호출 오류:', error);
+      throw error;
+    }
   },
   
   checkConnection: async (): Promise<boolean> => {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    return Math.random() > 0.1;
+    try {
+      const response = await fetch('/api/status');
+      return response.ok;
+    } catch {
+      return false;
   }
 };
 
@@ -73,7 +84,7 @@ export function ChatInterface() {
         )
       );
 
-      const response = await mockApi.sendMessage(content);
+      const response = await mcpApi.sendMessage(content);
       
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),

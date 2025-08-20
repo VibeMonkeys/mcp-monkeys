@@ -1,5 +1,5 @@
 server:
-  port: 8080
+  port: 8090
 
 spring:
   application:
@@ -23,13 +23,13 @@ spring:
 
 mcp:
   github:
-    url: ${MCP_GITHUB_URL:http://localhost:8082}
+    url: ${MCP_GITHUB_URL:http://localhost:8092}
   jira:
-    url: ${MCP_JIRA_URL:http://localhost:8083}
+    url: ${MCP_JIRA_URL:http://localhost:8093}
   gmail:
-    url: ${MCP_GMAIL_URL:http://localhost:8084}
+    url: ${MCP_GMAIL_URL:http://localhost:8094}
   slack:
-    url: ${MCP_SLACK_URL:http://localhost:8085}
+    url: ${MCP_SLACK_URL:http://localhost:8095}
 
 management:
   endpoints:
