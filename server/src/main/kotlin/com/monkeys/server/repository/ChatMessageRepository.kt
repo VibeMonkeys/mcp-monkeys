@@ -7,4 +7,5 @@ import org.springframework.stereotype.Repository
 @Repository
 interface ChatMessageRepository : JpaRepository<ChatMessage, Long> {
     fun findTop20ByOrderByIdAsc(): List<ChatMessage>
+    fun findTop10ByOrderByIdDesc(): List<ChatMessage>
 }
