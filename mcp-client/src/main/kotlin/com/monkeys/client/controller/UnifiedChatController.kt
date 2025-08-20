@@ -8,7 +8,7 @@ import org.slf4j.LoggerFactory
 
 @RestController
 @RequestMapping("/api")
-@CrossOrigin(origins = ["http://localhost:3000"]) // React 개발 서버용
+@CrossOrigin(origins = ["http://localhost:3001"]) // React 개발 서버용
 class UnifiedChatController(
     private val chatClient: ChatClient,
     private val unifiedMcpService: UnifiedMcpService
@@ -71,10 +71,10 @@ class UnifiedChatController(
             "service" to "Unified MCP Client",
             "version" to "1.0.0",
             "mcpServers" to mapOf(
-                "github" to "http://localhost:8082",
-                "jira" to "http://localhost:8083",
-                "gmail" to "http://localhost:8084",
-                "slack" to "http://localhost:8085"
+                "github" to "http://localhost:8092",
+                "jira" to "http://localhost:8093",
+                "gmail" to "http://localhost:8094",
+                "slack" to "http://localhost:8095"
             ),
             "timestamp" to System.currentTimeMillis()
         )

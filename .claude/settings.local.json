@@ -19,7 +19,9 @@
       "Bash(npm install:*)",
       "Bash(npm run dev:*)",
       "Bash(git commit:*)",
-      "Bash(tree:*)"
+      "Bash(tree:*)",
+      "Bash(lsof:*)",
+      "Bash(kill:*)"
     ],
     "deny": [],
     "ask": []
