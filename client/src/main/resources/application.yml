@@ -1,0 +1,32 @@
+# MCP Client 설정
+mcp:
+  server:
+    url: http://localhost:8082
+
+server:
+  port: 8081
+
+# 로깅 설정
+logging:
+  level:
+    com.monkeys.client: DEBUG
+    org.springframework.ai: DEBUG
+    reactor.netty: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+# WebClient 설정
+spring:
+  webflux:
+    base-path: /
+  codec:
+    max-in-memory-size: 10MB
+    
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
