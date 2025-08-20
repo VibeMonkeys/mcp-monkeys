@@ -1,0 +1,46 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: unified-mcp-client
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY:dummy-key}
+  datasource:
+    url: jdbc:h2:mem:testdb
+    driverClassName: org.h2.Driver
+    username: sa
+    password: password
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+  h2:
+    console:
+      enabled: true
+
+mcp:
+  github:
+    url: ${MCP_GITHUB_URL:http://localhost:8082}
+  jira:
+    url: ${MCP_JIRA_URL:http://localhost:8083}
+  gmail:
+    url: ${MCP_GMAIL_URL:http://localhost:8084}
+  slack:
+    url: ${MCP_SLACK_URL:http://localhost:8085}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    com.monkeys.client: DEBUG
+    org.springframework.ai: INFO
