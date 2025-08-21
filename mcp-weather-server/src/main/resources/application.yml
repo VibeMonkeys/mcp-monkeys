@@ -1,0 +1,32 @@
+server:
+  port: 8092
+
+spring:
+  application:
+    name: weather-mcp-server
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY:dummy-key}
+    mcp:
+      server:
+        enabled: true
+        name: weather-mcp-server
+        version: 1.0.0
+
+weather:
+  api:
+    key: ${WEATHER_API_KEY:dummy-key}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,mcp
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    com.monkeys.weather: DEBUG
+    org.springframework.ai: INFO
