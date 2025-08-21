@@ -8,31 +8,26 @@ import com.fasterxml.jackson.annotation.JsonPropertyDescription
 data class SlackMessage(
     @JsonProperty(required = true)
     @JsonPropertyDescription("메시지 타임스탬프")
-    val timestamp: String,
+    val ts: String,
+    
+    @JsonProperty(required = true)
+    @JsonPropertyDescription("작성자 ID")
+    val user: String,
     
     @JsonProperty(required = true)
     @JsonPropertyDescription("메시지 내용")
     val text: String,
     
     @JsonProperty(required = true)
-    @JsonPropertyDescription("발신자 사용자 ID")
-    val user: String,
-    
-    @JsonProperty(required = true)
     @JsonPropertyDescription("채널 ID")
     val channel: String,
     
-    @JsonPropertyDescription("발신자 이름")
-    val username: String?,
+    @JsonProperty(required = true)
+    @JsonPropertyDescription("메시지 타입")
+    val type: String,
     
     @JsonPropertyDescription("스레드 타임스탬프")
-    val threadTimestamp: String?,
-    
-    @JsonPropertyDescription("반응 목록")
-    val reactions: List<SlackReaction> = emptyList(),
-    
-    @JsonPropertyDescription("첨부파일 목록")
-    val attachments: List<SlackAttachment> = emptyList()
+    val threadTs: String? = null
 )
 
 @JsonClassDescription("Slack 채널 정보")
@@ -120,4 +115,40 @@ data class SlackAttachment(
     
     @JsonPropertyDescription("다운로드 URL")
     val url: String?
+)
+
+@JsonClassDescription("Slack 메시지 발송 결과")
+data class SlackSendResult(
+    @JsonProperty(required = true)
+    @JsonPropertyDescription("발송 성공 여부")
+    val success: Boolean,
+    
+    @JsonPropertyDescription("메시지 타임스탬프")
+    val timestamp: String?,
+    
+    @JsonPropertyDescription("오류 메시지")
+    val error: String?
+)
+
+@JsonClassDescription("API 상태 확인 결과")
+data class ApiStatusResult(
+    @JsonProperty(required = true)
+    @JsonPropertyDescription("GitHub API 상태")
+    val github: String,
+    
+    @JsonProperty(required = true)
+    @JsonPropertyDescription("Jira API 상태")
+    val jira: String,
+    
+    @JsonProperty(required = true)
+    @JsonPropertyDescription("Gmail API 상태")
+    val gmail: String,
+    
+    @JsonProperty(required = true)
+    @JsonPropertyDescription("Slack API 상태")
+    val slack: String,
+    
+    @JsonProperty(required = true)
+    @JsonPropertyDescription("확인 시간")
+    val timestamp: Long
 )

@@ -1,8 +1,8 @@
 rootProject.name = "mcp-monkeys"
 
 include("shared")
-include("mcp-github-server")
-include("mcp-jira-server")
-include("mcp-gmail-server")
-include("mcp-slack-server")
+include("mcp-weather-server")
+include("mcp-news-server")
+include("mcp-translate-server")
+include("mcp-calendar-server")
 include("mcp-client")

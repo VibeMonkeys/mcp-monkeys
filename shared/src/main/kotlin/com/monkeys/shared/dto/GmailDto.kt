@@ -18,32 +18,15 @@ data class GmailMessage(
     @JsonPropertyDescription("발신자")
     val from: String,
     
-    @JsonProperty(required = true)
-    @JsonPropertyDescription("수신자")
-    val to: List<String>,
+    @JsonPropertyDescription("메일 스니펫")
+    val snippet: String,
     
-    @JsonPropertyDescription("참조")
-    val cc: List<String> = emptyList(),
-    
-    @JsonPropertyDescription("숨은참조")
-    val bcc: List<String> = emptyList(),
-    
-    @JsonPropertyDescription("메일 본문")
-    val body: String?,
+    @JsonPropertyDescription("메일 날짜")
+    val date: String,
     
     @JsonProperty(required = true)
-    @JsonPropertyDescription("읽음 여부")
-    val isRead: Boolean,
-    
-    @JsonProperty(required = true)
-    @JsonPropertyDescription("수신 날짜")
-    val receivedAt: String,
-    
-    @JsonPropertyDescription("라벨 목록")
-    val labels: List<String> = emptyList(),
-    
-    @JsonPropertyDescription("첨부파일 개수")
-    val attachmentCount: Int = 0
+    @JsonPropertyDescription("읽지 않음 여부")
+    val isUnread: Boolean
 )
 
 @JsonClassDescription("Gmail 라벨 정보")
@@ -67,26 +50,15 @@ data class GmailLabel(
     val totalCount: Int = 0
 )
 
-@JsonClassDescription("Gmail 메일 작성 요청")
-data class GmailComposeRequest(
+@JsonClassDescription("Gmail 메일 발송 결과")
+data class GmailSendResult(
     @JsonProperty(required = true)
-    @JsonPropertyDescription("수신자 이메일")
-    val to: List<String>,
+    @JsonPropertyDescription("발송 성공 여부")
+    val success: Boolean,
     
-    @JsonProperty(required = true)
-    @JsonPropertyDescription("메일 제목")
-    val subject: String,
+    @JsonPropertyDescription("메시지 ID")
+    val messageId: String?,
     
-    @JsonProperty(required = true)
-    @JsonPropertyDescription("메일 본문")
-    val body: String,
-    
-    @JsonPropertyDescription("참조")
-    val cc: List<String> = emptyList(),
-    
-    @JsonPropertyDescription("숨은참조")
-    val bcc: List<String> = emptyList(),
-    
-    @JsonPropertyDescription("HTML 형식 여부")
-    val isHtml: Boolean = false
+    @JsonPropertyDescription("오류 메시지")
+    val error: String?
 )
