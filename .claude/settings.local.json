@@ -21,7 +21,18 @@
       "Bash(git commit:*)",
       "Bash(tree:*)",
       "Bash(lsof:*)",
-      "Bash(kill:*)"
+      "Bash(kill:*)",
+      "WebSearch",
+      "Bash(mv:*)",
+      "Bash(rm:*)",
+      "Bash(./gradlew:*)",
+      "Bash(gradle:*)",
+      "Bash(source:*)",
+      "Bash(curl:*)",
+      "Bash(java:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git rm:*)"
     ],
     "deny": [],
     "ask": []
