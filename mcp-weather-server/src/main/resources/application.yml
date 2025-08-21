@@ -12,6 +12,14 @@ spring:
         enabled: true
         name: weather-mcp-server
         version: 1.0.0
+        type: SYNC
+        description: "Weather information service using OpenWeatherMap API"
+        sse-message-endpoint: /mcp/messages
+        capabilities:
+          tool: true
+          resource: false
+          prompt: false
+          completion: true
 
 weather:
   api:

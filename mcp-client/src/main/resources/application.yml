@@ -9,7 +9,20 @@ spring:
       api-key: ${OPENAI_API_KEY:dummy-key}
     mcp:
       client:
-        enabled: false
+        enabled: true
+        servers:
+          weather:
+            url: http://localhost:8092/sse
+            name: weather-mcp-server
+          news:
+            url: http://localhost:8093/sse
+            name: news-mcp-server
+          translate:
+            url: http://localhost:8094/sse
+            name: translate-mcp-server
+          calendar:
+            url: http://localhost:8095/sse
+            name: calendar-mcp-server
   datasource:
     url: jdbc:h2:mem:testdb
     driverClassName: org.h2.Driver

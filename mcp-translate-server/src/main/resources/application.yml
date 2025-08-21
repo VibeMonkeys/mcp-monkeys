@@ -3,25 +3,34 @@ server:
 
 spring:
   application:
-    name: gmail-mcp-server
+    name: translate-mcp-server
   ai:
     openai:
-      api-key: dummy-key
-
-gmail:
-  client-id: ${GMAIL_CLIENT_ID:dummy-client-id}
-  client-secret: ${GMAIL_CLIENT_SECRET:dummy-client-secret}
+      api-key: ${OPENAI_API_KEY:dummy-key}
+    mcp:
+      server:
+        enabled: true
+        name: translate-mcp-server
+        version: 1.0.0
+        type: SYNC
+        description: "Multi-language translation service"
+        sse-message-endpoint: /mcp/messages
+        capabilities:
+          tool: true
+          resource: false
+          prompt: false
+          completion: true
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,mcp
   endpoint:
     health:
       show-details: always
 
 logging:
   level:
-    com.monkeys.gmail: DEBUG
+    com.monkeys.translate: DEBUG
     org.springframework.ai: INFO

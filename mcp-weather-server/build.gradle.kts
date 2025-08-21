@@ -34,7 +34,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-webflux")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
-    implementation("org.springframework.ai:spring-ai-starter-mcp-server")
+    implementation("org.springframework.ai:spring-ai-starter-mcp-server-webmvc")
     implementation("org.springframework.ai:spring-ai-starter-model-openai")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
