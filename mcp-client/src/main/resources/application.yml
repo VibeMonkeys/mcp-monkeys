@@ -10,19 +10,23 @@ spring:
     mcp:
       client:
         enabled: true
-        servers:
-          weather:
-            url: http://localhost:8092/sse
-            name: weather-mcp-server
-          news:
-            url: http://localhost:8093/sse
-            name: news-mcp-server
-          translate:
-            url: http://localhost:8094/sse
-            name: translate-mcp-server
-          calendar:
-            url: http://localhost:8095/sse
-            name: calendar-mcp-server
+        type: SYNC
+        request-timeout: 30s
+        sse:
+          transport-mode: WEBFLUX
+          connections:
+            weather:
+              url: http://localhost:8092
+              name: weather-mcp-server
+            news:
+              url: http://localhost:8093
+              name: news-mcp-server
+            translate:
+              url: http://localhost:8094
+              name: translate-mcp-server
+            calendar:
+              url: http://localhost:8095
+              name: calendar-mcp-server
   datasource:
     url: jdbc:h2:mem:testdb
     driverClassName: org.h2.Driver
@@ -74,4 +78,5 @@ management:
 logging:
   level:
     com.monkeys.client: DEBUG
-    org.springframework.ai: INFO
+    org.springframework.ai: DEBUG
+    org.springframework.ai.mcp: DEBUG
