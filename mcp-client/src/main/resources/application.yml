@@ -7,6 +7,9 @@ spring:
   ai:
     openai:
       api-key: ${OPENAI_API_KEY:dummy-key}
+    mcp:
+      client:
+        enabled: false
   datasource:
     url: jdbc:h2:mem:testdb
     driverClassName: org.h2.Driver
@@ -21,15 +24,30 @@ spring:
     console:
       enabled: true
 
-mcp:
+# API Settings - Configure these environment variables
+api:
   github:
-    url: ${MCP_GITHUB_URL:http://localhost:8092}
+    token: ${GITHUB_TOKEN:dummy-token}
   jira:
-    url: ${MCP_JIRA_URL:http://localhost:8093}
+    url: ${JIRA_URL:https://your-domain.atlassian.net}
+    email: ${JIRA_EMAIL:dummy@email.com}
+    token: ${JIRA_TOKEN:dummy-token}
   gmail:
-    url: ${MCP_GMAIL_URL:http://localhost:8094}
+    client-id: ${GMAIL_CLIENT_ID:dummy-client-id}
+    client-secret: ${GMAIL_CLIENT_SECRET:dummy-client-secret}
+    refresh-token: ${GMAIL_REFRESH_TOKEN:dummy-refresh-token}
   slack:
-    url: ${MCP_SLACK_URL:http://localhost:8095}
+    bot-token: ${SLACK_BOT_TOKEN:xoxb-dummy-token}
+    
+mcp:
+  weather:
+    url: ${MCP_WEATHER_URL:http://localhost:8092}
+  news:
+    url: ${MCP_NEWS_URL:http://localhost:8093}
+  translate:
+    url: ${MCP_TRANSLATE_URL:http://localhost:8094}
+  calendar:
+    url: ${MCP_CALENDAR_URL:http://localhost:8095}
 
 management:
   endpoints:
