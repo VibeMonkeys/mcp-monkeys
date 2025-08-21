@@ -1,6 +1,6 @@
 package com.monkeys.client.controller
 
-import com.monkeys.client.service.UnifiedMcpService
+import com.monkeys.client.service.SimpleUnifiedMcpService
 import org.springframework.ai.chat.client.ChatClient
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
@@ -11,7 +11,7 @@ import org.slf4j.LoggerFactory
 @CrossOrigin(origins = ["http://localhost:3004"]) // React 개발 서버용
 class UnifiedChatController(
     private val chatClient: ChatClient,
-    private val unifiedMcpService: UnifiedMcpService
+    private val unifiedMcpService: SimpleUnifiedMcpService
 ) {
     private val logger = LoggerFactory.getLogger(UnifiedChatController::class.java)
 
@@ -71,23 +71,23 @@ class UnifiedChatController(
             "service" to "Unified MCP Client",
             "version" to "1.0.0",
             "mcpServers" to mapOf(
-                "github" to "http://localhost:8092",
-                "jira" to "http://localhost:8093",
-                "gmail" to "http://localhost:8094",
-                "slack" to "http://localhost:8095"
+                "weather" to "http://localhost:8092",
+                "news" to "http://localhost:8093", 
+                "translate" to "http://localhost:8094",
+                "calendar" to "http://localhost:8095"
             ),
             "timestamp" to System.currentTimeMillis()
         )
     }
 
-    @PostMapping("/mcp-status")
-    fun checkMcpStatus(): ResponseEntity<Map<String, Any>> {
+    @PostMapping("/api-status")
+    fun checkApiStatus(): ResponseEntity<Map<String, Any>> {
         return try {
-            val statusResult = unifiedMcpService.checkAllMcpServersStatus()
+            val statusResult = unifiedMcpService.checkAllApiStatus()
             ResponseEntity.ok(
                 mapOf(
                     "success" to true,
-                    "mcpServersStatus" to statusResult,
+                    "apiStatus" to statusResult,
                     "timestamp" to System.currentTimeMillis()
                 )
             )
@@ -95,7 +95,7 @@ class UnifiedChatController(
             ResponseEntity.status(500).body(
                 mapOf(
                     "success" to false,
-                    "error" to "MCP 서버 상태 확인 중 오류: ${e.message}",
+                    "error" to "API 상태 확인 중 오류: ${e.message}",
                     "timestamp" to System.currentTimeMillis()
                 )
             )
