@@ -1,0 +1,27 @@
+server:
+  port: 8095
+
+spring:
+  application:
+    name: slack-mcp-server
+  ai:
+    openai:
+      api-key: dummy-key
+
+slack:
+  bot-token: ${SLACK_BOT_TOKEN:dummy-bot-token}
+  signing-secret: ${SLACK_SIGNING_SECRET:dummy-signing-secret}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    com.monkeys.slack: DEBUG
+    org.springframework.ai: INFO
