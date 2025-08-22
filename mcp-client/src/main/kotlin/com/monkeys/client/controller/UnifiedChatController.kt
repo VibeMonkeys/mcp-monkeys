@@ -1,42 +1,83 @@
 package com.monkeys.client.controller
 
+import com.monkeys.client.dto.*
 import com.monkeys.client.service.SimpleUnifiedMcpService
 import org.springframework.ai.chat.client.ChatClient
+import org.springframework.ai.converter.BeanOutputConverter
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 import org.slf4j.LoggerFactory
+import reactor.core.publisher.Flux
+import org.springframework.http.MediaType
 
 @RestController
 @RequestMapping("/api")
-@CrossOrigin(origins = ["http://localhost:3004"]) // React 개발 서버용
+@CrossOrigin(origins = ["http://localhost:3004", "http://localhost:3000"]) // React 개발 서버용
 class UnifiedChatController(
     private val chatClient: ChatClient,
     private val unifiedMcpService: SimpleUnifiedMcpService
 ) {
     private val logger = LoggerFactory.getLogger(UnifiedChatController::class.java)
 
-    data class ChatRequest(val message: String)
+    data class ChatRequest(
+        val message: String, 
+        val sessionId: String? = null,
+        val format: String? = null // "structured" 또는 "text"
+    )
     data class ChatResponse(val response: String, val timestamp: Long = System.currentTimeMillis())
+    data class StructuredChatResponse(val data: Any, val format: String, val timestamp: Long = System.currentTimeMillis())
 
     @PostMapping("/chat")
-    fun chat(@RequestBody request: ChatRequest): ResponseEntity<ChatResponse> {
+    fun chat(@RequestBody request: ChatRequest): ResponseEntity<Any> {
         logger.info("통합 채팅 요청: {}", request.message)
         
         return try {
-            val response = chatClient.prompt()
-                .user(buildPrompt(request.message))
-                .tools(unifiedMcpService) // 모든 MCP 도구들 포함
-                .call()
-                .content() ?: "응답을 생성할 수 없습니다."
+            // 세션 ID 설정
+            val sessionId = request.sessionId ?: "default-session"
             
-            logger.info("AI 응답 생성 완료")
-            ResponseEntity.ok(ChatResponse(response))
+            val chatBuilder = chatClient.prompt()
+                .user(buildPrompt(request.message))
+                .tools(unifiedMcpService)
+            
+            // Structured Output 요청 처리
+            if (request.format == "structured") {
+                val responseType = determineResponseType(request.message)
+                val converter = BeanOutputConverter(responseType)
+                
+                val structuredResponse = chatBuilder
+                    .user("${request.message}\n\n${converter.format}")
+                    .call()
+                    .entity(responseType)
+                
+                ResponseEntity.ok(StructuredChatResponse(structuredResponse ?: "No response", "structured"))
+            } else {
+                val response = chatBuilder
+                    .call()
+                    .content() ?: "응답을 생성할 수 없습니다."
+                
+                ResponseEntity.ok(ChatResponse(response))
+            }
         } catch (e: Exception) {
             logger.error("채팅 처리 중 오류: {}", e.message, e)
             ResponseEntity.status(500).body(
                 ChatResponse("요청 처리 중 오류가 발생했습니다: ${e.message}")
             )
         }
+    }
+    
+    @GetMapping(value = ["/chat/stream"], produces = [MediaType.TEXT_EVENT_STREAM_VALUE])
+    fun chatStream(@RequestParam message: String, @RequestParam(required = false) sessionId: String?): Flux<String> {
+        logger.info("스트리밍 채팅 요청: {}", message)
+        
+        val actualSessionId = sessionId ?: "default-session"
+        
+        return chatClient.prompt()
+            .user(buildPrompt(message))
+            .tools(unifiedMcpService)
+            .stream()
+            .content()
+            .map { chunk -> "data: $chunk\n\n" }
+            .onErrorReturn("data: [ERROR] 스트리밍 중 오류가 발생했습니다.\n\n")
     }
 
     @GetMapping("/tools")
@@ -102,18 +143,30 @@ class UnifiedChatController(
         }
     }
 
+    private fun determineResponseType(message: String): Class<*> {
+        return when {
+            message.contains("날씨", ignoreCase = true) || 
+            message.contains("weather", ignoreCase = true) -> WeatherResponse::class.java
+            
+            message.contains("뉴스", ignoreCase = true) || 
+            message.contains("news", ignoreCase = true) -> NewsResponse::class.java
+            
+            message.contains("번역", ignoreCase = true) || 
+            message.contains("translate", ignoreCase = true) -> TranslationResponse::class.java
+            
+            message.contains("일정", ignoreCase = true) || 
+            message.contains("calendar", ignoreCase = true) -> CalendarResponse::class.java
+            
+            else -> MultiServiceResponse::class.java
+        }
+    }
+    
     private fun buildPrompt(userMessage: String): String {
-        return """당신은 여러 외부 시스템에 접근할 수 있는 통합 AI 어시스턴트입니다.
-
-사용 가능한 도구들:
-- GitHub: 이슈 조회/생성, Pull Request 관리, 저장소 정보
-- Jira: 프로젝트 이슈 관리, 스프린트 정보, 이슈 생성
-- Gmail: 메일 조회/발송 (설정 필요)
-- Slack: 메시지 전송/조회 (설정 필요)
-
+        return """
 사용자 요청: $userMessage
 
-사용자의 요청을 분석하여 적절한 도구를 사용하고 도움이 되는 정보를 제공해주세요.
-여러 시스템을 연계해야 하는 경우 순서대로 처리해주세요."""
+요청을 분석하여 적절한 도구를 사용하고 도움이 되는 정보를 제공해주세요.
+여러 시스템을 연계해야 하는 경우 순서대로 처리해주세요.
+        """.trimIndent()
     }
 }
