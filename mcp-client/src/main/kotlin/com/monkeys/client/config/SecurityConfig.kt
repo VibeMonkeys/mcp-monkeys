@@ -60,12 +60,12 @@ data class ApiCredentials(
 @ConfigurationProperties(prefix = "mcp")
 @Validated  
 data class McpServerUrls(
-    val weather: ServerUrl = ServerUrl("http://localhost:8092"),
-    val news: ServerUrl = ServerUrl("http://localhost:8093"),
-    val translate: ServerUrl = ServerUrl("http://localhost:8094"),
-    val calendar: ServerUrl = ServerUrl("http://localhost:8095")
+    val weather: ServerConfig = ServerConfig("http://localhost:8092"),
+    val news: ServerConfig = ServerConfig("http://localhost:8093"),
+    val translate: ServerConfig = ServerConfig("http://localhost:8094"),
+    val calendar: ServerConfig = ServerConfig("http://localhost:8095")
 ) {
-    data class ServerUrl(
+    data class ServerConfig(
         @field:NotBlank
         val url: String
     )

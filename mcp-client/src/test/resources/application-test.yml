@@ -1,0 +1,68 @@
+server:
+  port: 0 # 랜덤 포트 사용
+
+spring:
+  application:
+    name: unified-mcp-client-test
+  ai:
+    openai:
+      api-key: test-dummy-key
+    mcp:
+      client:
+        enabled: false # 테스트 시 MCP 연결 비활성화
+  datasource:
+    url: jdbc:h2:mem:testdb-${random.uuid}
+    driverClassName: org.h2.Driver
+    username: sa
+    password: password
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false # 테스트 시 SQL 로그 비활성화
+  h2:
+    console:
+      enabled: false
+
+# API Settings for Testing
+api:
+  github:
+    token: test-github-token
+  jira:
+    url: https://test-domain.atlassian.net
+    email: test@email.com
+    token: test-jira-token
+  gmail:
+    client-id: test-gmail-client-id
+    client-secret: test-gmail-client-secret
+    refresh-token: test-gmail-refresh-token
+  slack:
+    bot-token: xoxb-test-slack-token
+
+# 테스트용 MCP 서버 URL
+mcp:
+  weather:
+    url: http://localhost:8092
+  news:
+    url: http://localhost:8093
+  translate:
+    url: http://localhost:8094
+  calendar:
+    url: http://localhost:8095
+
+# Actuator 엔드포인트 비활성화 (테스트 속도 향상)
+management:
+  endpoints:
+    enabled-by-default: false
+  endpoint:
+    health:
+      enabled: true
+  health:
+    db:
+      enabled: false
+
+logging:
+  level:
+    com.monkeys.client: WARN # 테스트 시 로그 레벨 낮춤
+    org.springframework: WARN
+    root: WARN

@@ -13,10 +13,15 @@ import org.slf4j.LoggerFactory
 class NewsMcpService(
     @Value("\${news.api.key:dummy-key}") private val apiKey: String
 ) {
-    private val client = OkHttpClient()
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+        .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+        .retryOnConnectionFailure(true)
+        .build()
     private val mapper = jacksonObjectMapper()
     private val logger = LoggerFactory.getLogger(NewsMcpService::class.java)
     private val baseUrl = "https://newsapi.org/v2"
+    private val maxRetries = 3
 
     @Tool(description = "최신 뉴스 헤드라인을 조회합니다")
     fun getTopHeadlines(
@@ -32,19 +37,9 @@ class NewsMcpService(
         }
         
         return try {
-            val url = "$baseUrl/top-headlines?country=$country&category=$category&pageSize=$pageSize&apiKey=$apiKey"
-            val request = Request.Builder()
-                .url(url)
-                .build()
-
-            val response = client.newCall(request).execute()
-            if (!response.isSuccessful) {
-                logger.error("뉴스 API 호출 실패: ${response.code} ${response.message}")
-                return listOf(createDummyNews("뉴스를 가져올 수 없습니다: ${response.code}"))
+            val newsData = executeWithRetry {
+                fetchNewsData("$baseUrl/top-headlines?country=$country&category=$category&pageSize=$pageSize&apiKey=$apiKey")
             }
-
-            val jsonResponse = response.body?.string() ?: "{}"
-            val newsData: Map<String, Any> = mapper.readValue(jsonResponse)
             
             val articles = newsData["articles"] as? List<Map<String, Any>> ?: emptyList()
             
@@ -83,19 +78,9 @@ class NewsMcpService(
         
         return try {
             val encodedQuery = java.net.URLEncoder.encode(query, "UTF-8")
-            val url = "$baseUrl/everything?q=$encodedQuery&sortBy=$sortBy&language=$language&pageSize=$pageSize&apiKey=$apiKey"
-            val request = Request.Builder()
-                .url(url)
-                .build()
-
-            val response = client.newCall(request).execute()
-            if (!response.isSuccessful) {
-                logger.error("뉴스 검색 API 호출 실패: ${response.code} ${response.message}")
-                return listOf(createDummyNews("뉴스 검색을 할 수 없습니다: ${response.code}"))
+            val newsData = executeWithRetry {
+                fetchNewsData("$baseUrl/everything?q=$encodedQuery&sortBy=$sortBy&language=$language&pageSize=$pageSize&apiKey=$apiKey")
             }
-
-            val jsonResponse = response.body?.string() ?: "{}"
-            val newsData: Map<String, Any> = mapper.readValue(jsonResponse)
             
             val articles = newsData["articles"] as? List<Map<String, Any>> ?: emptyList()
             
@@ -129,19 +114,9 @@ class NewsMcpService(
         }
         
         return try {
-            val url = "$baseUrl/everything?sources=$source&pageSize=$pageSize&apiKey=$apiKey"
-            val request = Request.Builder()
-                .url(url)
-                .build()
-
-            val response = client.newCall(request).execute()
-            if (!response.isSuccessful) {
-                logger.error("출처별 뉴스 API 호출 실패: ${response.code} ${response.message}")
-                return listOf(createDummyNews("출처별 뉴스를 가져올 수 없습니다: ${response.code}"))
+            val newsData = executeWithRetry {
+                fetchNewsData("$baseUrl/everything?sources=$source&pageSize=$pageSize&apiKey=$apiKey")
             }
-
-            val jsonResponse = response.body?.string() ?: "{}"
-            val newsData: Map<String, Any> = mapper.readValue(jsonResponse)
             
             val articles = newsData["articles"] as? List<Map<String, Any>> ?: emptyList()
             
@@ -173,6 +148,49 @@ class NewsMcpService(
         publishedAt = "2024-01-01T00:00:00Z",
         content = errorMessage
     )
+    
+    private fun <T> executeWithRetry(operation: () -> T): T {
+        var lastException: Exception? = null
+        
+        repeat(maxRetries) { attempt ->
+            try {
+                return operation()
+            } catch (e: Exception) {
+                lastException = e
+                logger.warn("뉴스 API 호출 시도 ${attempt + 1}/$maxRetries 실패: ${e.message}")
+                
+                if (attempt < maxRetries - 1) {
+                    val delay = (1000 * Math.pow(2.0, attempt.toDouble())).toLong()
+                    Thread.sleep(delay)
+                }
+            }
+        }
+        
+        throw lastException ?: RuntimeException("뉴스 API 호출이 $maxRetries 번 모두 실패했습니다")
+    }
+    
+    private fun fetchNewsData(url: String): Map<String, Any> {
+        val request = Request.Builder()
+            .url(url)
+            .addHeader("User-Agent", "MCP-Monkeys-News/1.0")
+            .addHeader("X-Api-Key", apiKey)
+            .build()
+
+        client.newCall(request).execute().use { response ->
+            when (response.code) {
+                200 -> {
+                    val jsonResponse = response.body?.string() ?: "{}"
+                    return mapper.readValue(jsonResponse)
+                }
+                400 -> throw IllegalArgumentException("잘못된 요청입니다. 파라미터를 확인해주세요.")
+                401 -> throw IllegalArgumentException("잘못된 API 키입니다. NEWS_API_KEY를 확인해주세요.")
+                426 -> throw RuntimeException("뉴스 API 업그레이드가 필요합니다. 개발자 플랜으로 업그레이드하세요.")
+                429 -> throw RuntimeException("API 사용량 한도를 초과했습니다. 잠시 후 다시 시도해주세요.")
+                500 -> throw RuntimeException("뉴스 서비스 일시 장애입니다. 잠시 후 다시 시도해주세요.")
+                else -> throw RuntimeException("예상치 못한 오류입니다: ${response.code} ${response.message}")
+            }
+        }
+    }
 }
 
 data class NewsArticle(

@@ -13,10 +13,15 @@ import org.slf4j.LoggerFactory
 class WeatherMcpService(
     @Value("\${weather.api.key:dummy-key}") private val apiKey: String
 ) {
-    private val client = OkHttpClient()
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
+        .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+        .retryOnConnectionFailure(true)
+        .build()
     private val mapper = jacksonObjectMapper()
     private val logger = LoggerFactory.getLogger(WeatherMcpService::class.java)
     private val baseUrl = "http://api.openweathermap.org/data/2.5"
+    private val maxRetries = 3
 
     @Tool(description = "지정된 도시의 현재 날씨 정보를 조회합니다")
     fun getCurrentWeather(
@@ -26,23 +31,13 @@ class WeatherMcpService(
         units: String = "metric"
     ): WeatherInfo {
         if (apiKey == "dummy-key") {
-            return createDummyWeather(city, "OpenWeatherMap API 키가 설정되지 않았습니다. WEATHER_API_KEY 환경변수를 설정해주세요.")
+            return createDummyWeather(city, "OpenWeatherMap API 키가 설정되지 않았습니다. WEATHER_API_KEY 환경변수를 설정해주세요.", units)
         }
         
         return try {
-            val url = "$baseUrl/weather?q=$city&appid=$apiKey&units=$units&lang=ko"
-            val request = Request.Builder()
-                .url(url)
-                .build()
-
-            val response = client.newCall(request).execute()
-            if (!response.isSuccessful) {
-                logger.error("날씨 API 호출 실패: ${response.code} ${response.message}")
-                return createDummyWeather(city, "날씨 정보를 가져올 수 없습니다: ${response.code}")
+            val weatherData = executeWithRetry { 
+                fetchWeatherData("$baseUrl/weather?q=$city&appid=$apiKey&units=$units&lang=ko")
             }
-
-            val jsonResponse = response.body?.string() ?: "{}"
-            val weatherData: Map<String, Any> = mapper.readValue(jsonResponse)
             
             val main = weatherData["main"] as Map<String, Any>
             val weather = (weatherData["weather"] as List<Map<String, Any>>).first()
@@ -64,7 +59,7 @@ class WeatherMcpService(
             )
         } catch (e: Exception) {
             logger.error("날씨 정보 조회 중 오류", e)
-            createDummyWeather(city, "날씨 정보 조회 중 오류: ${e.message}")
+            createDummyWeather(city, "날씨 정보 조회 중 오류: ${e.message}", units)
         }
     }
 
@@ -82,19 +77,9 @@ class WeatherMcpService(
         }
         
         return try {
-            val url = "$baseUrl/forecast?q=$city&appid=$apiKey&units=$units&lang=ko&cnt=$count"
-            val request = Request.Builder()
-                .url(url)
-                .build()
-
-            val response = client.newCall(request).execute()
-            if (!response.isSuccessful) {
-                logger.error("날씨 예보 API 호출 실패: ${response.code} ${response.message}")
-                return listOf(createDummyForecast(city, "날씨 예보를 가져올 수 없습니다: ${response.code}"))
+            val forecastData = executeWithRetry { 
+                fetchWeatherData("$baseUrl/forecast?q=$city&appid=$apiKey&units=$units&lang=ko&cnt=$count")
             }
-
-            val jsonResponse = response.body?.string() ?: "{}"
-            val forecastData: Map<String, Any> = mapper.readValue(jsonResponse)
             
             val forecasts = forecastData["list"] as List<Map<String, Any>>
             val cityInfo = forecastData["city"] as Map<String, Any>
@@ -139,7 +124,7 @@ class WeatherMcpService(
     }
 
     // 더미 데이터 생성 함수들
-    private fun createDummyWeather(city: String, errorMessage: String) = WeatherInfo(
+    private fun createDummyWeather(city: String, errorMessage: String, units: String = "metric") = WeatherInfo(
         city = city,
         country = "XX",
         temperature = 20.0,
@@ -151,7 +136,7 @@ class WeatherMcpService(
         windSpeed = 3.5,
         windDirection = 180,
         visibility = 10000,
-        units = "metric"
+        units = units
     )
     
     private fun createDummyForecast(city: String, errorMessage: String) = WeatherForecast(
@@ -168,6 +153,50 @@ class WeatherMcpService(
         city = city,
         units = "metric"
     )
+    
+    // 재시도 로직을 포함한 API 호출
+    private fun <T> executeWithRetry(operation: () -> T): T {
+        var lastException: Exception? = null
+        
+        repeat(maxRetries) { attempt ->
+            try {
+                return operation()
+            } catch (e: Exception) {
+                lastException = e
+                logger.warn("API 호출 시도 ${attempt + 1}/$maxRetries 실패: ${e.message}")
+                
+                if (attempt < maxRetries - 1) {
+                    // 지수 백오프: 1초, 2초, 4초
+                    val delay = (1000 * Math.pow(2.0, attempt.toDouble())).toLong()
+                    Thread.sleep(delay)
+                }
+            }
+        }
+        
+        throw lastException ?: RuntimeException("API 호출이 $maxRetries 번 모두 실패했습니다")
+    }
+    
+    // HTTP 요청 실행 및 JSON 파싱
+    private fun fetchWeatherData(url: String): Map<String, Any> {
+        val request = Request.Builder()
+            .url(url)
+            .addHeader("User-Agent", "MCP-Monkeys-Weather/1.0")
+            .build()
+
+        client.newCall(request).execute().use { response ->
+            when (response.code) {
+                200 -> {
+                    val jsonResponse = response.body?.string() ?: "{}"
+                    return mapper.readValue(jsonResponse)
+                }
+                401 -> throw IllegalArgumentException("잘못된 API 키입니다. WEATHER_API_KEY를 확인해주세요.")
+                404 -> throw IllegalArgumentException("도시를 찾을 수 없습니다. 도시명을 확인해주세요.")
+                429 -> throw RuntimeException("API 사용량 한도를 초과했습니다. 잠시 후 다시 시도해주세요.")
+                500, 502, 503, 504 -> throw RuntimeException("날씨 서비스 일시 장애입니다. 잠시 후 다시 시도해주세요.")
+                else -> throw RuntimeException("예상치 못한 오류입니다: ${response.code} ${response.message}")
+            }
+        }
+    }
 }
 
 // 날씨 정보 데이터 클래스
