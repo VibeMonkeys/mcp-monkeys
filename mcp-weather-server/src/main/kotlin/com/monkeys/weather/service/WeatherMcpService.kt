@@ -8,20 +8,24 @@ import okhttp3.*
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import org.slf4j.LoggerFactory
+import io.micrometer.core.instrument.MeterRegistry
+import io.micrometer.core.instrument.Timer
 
 @Service
 class WeatherMcpService(
-    @Value("\${weather.api.key:dummy-key}") private val apiKey: String
+    @Value("\${weather.api.key:dummy-key}") private val apiKey: String,
+    private val weatherHttpClient: OkHttpClient,
+    private val meterRegistry: MeterRegistry
 ) {
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(10, java.util.concurrent.TimeUnit.SECONDS)
-        .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
-        .retryOnConnectionFailure(true)
-        .build()
     private val mapper = jacksonObjectMapper()
     private val logger = LoggerFactory.getLogger(WeatherMcpService::class.java)
-    private val baseUrl = "http://api.openweathermap.org/data/2.5"
+    private val baseUrl = "https://api.openweathermap.org/data/2.5"
     private val maxRetries = 3
+    
+    // 메트릭 타이머
+    private val weatherApiTimer = Timer.builder("weather.api.request")
+        .description("Weather API 요청 시간")
+        .register(meterRegistry)
 
     @Tool(description = "지정된 도시의 현재 날씨 정보를 조회합니다")
     fun getCurrentWeather(
@@ -31,8 +35,11 @@ class WeatherMcpService(
         units: String = "metric"
     ): WeatherInfo {
         if (apiKey == "dummy-key") {
-            return createDummyWeather(city, "OpenWeatherMap API 키가 설정되지 않았습니다. WEATHER_API_KEY 환경변수를 설정해주세요.", units)
+            logger.warn("Weather API 호출 실패: API 키가 설정되지 않음")
+            return createDummyWeather(city, "API 키가 설정되지 않았습니다.", units)
         }
+        
+        logger.info("날씨 조회 요청: city={}, units={}, apiKey={}", city, units, maskApiKey(apiKey))
         
         return try {
             val weatherData = executeWithRetry { 
@@ -57,9 +64,14 @@ class WeatherMcpService(
                 visibility = (weatherData["visibility"] as? Number)?.toInt() ?: 0,
                 units = units
             )
+        } catch (e: WeatherApiException) {
+            logger.error("Weather API 오류: {} (코드: {})", e.message, e.errorCode)
+            meterRegistry.counter("weather.service.error", "type", e.errorCode).increment()
+            createDummyWeather(city, "날씨 조회 실패: ${e.message}", units)
         } catch (e: Exception) {
-            logger.error("날씨 정보 조회 중 오류", e)
-            createDummyWeather(city, "날씨 정보 조회 중 오류: ${e.message}", units)
+            logger.error("예상치 못한 오류", e)
+            meterRegistry.counter("weather.service.error", "type", "UNEXPECTED").increment()
+            createDummyWeather(city, "일시적 오류가 발생했습니다", units)
         }
     }
 
@@ -104,9 +116,14 @@ class WeatherMcpService(
                     units = units
                 )
             }
+        } catch (e: WeatherApiException) {
+            logger.error("Weather Forecast API 오류: {} (코드: {})", e.message, e.errorCode)
+            meterRegistry.counter("weather.forecast.error", "type", e.errorCode).increment()
+            listOf(createDummyForecast(city, "예보 조회 실패: ${e.message}"))
         } catch (e: Exception) {
-            logger.error("날씨 예보 조회 중 오류", e)
-            listOf(createDummyForecast(city, "날씨 예보 조회 중 오류: ${e.message}"))
+            logger.error("예상치 못한 예보 오류", e)
+            meterRegistry.counter("weather.forecast.error", "type", "UNEXPECTED").increment()
+            listOf(createDummyForecast(city, "일시적 오류가 발생했습니다"))
         }
     }
 
@@ -176,28 +193,62 @@ class WeatherMcpService(
         throw lastException ?: RuntimeException("API 호출이 $maxRetries 번 모두 실패했습니다")
     }
     
-    // HTTP 요청 실행 및 JSON 파싱
+    // HTTP 요청 실행 및 JSON 파싱 (메트릭 포함)
     private fun fetchWeatherData(url: String): Map<String, Any> {
         val request = Request.Builder()
             .url(url)
             .addHeader("User-Agent", "MCP-Monkeys-Weather/1.0")
             .build()
 
-        client.newCall(request).execute().use { response ->
-            when (response.code) {
-                200 -> {
-                    val jsonResponse = response.body?.string() ?: "{}"
-                    return mapper.readValue(jsonResponse)
+        return weatherApiTimer.recordCallable {
+            weatherHttpClient.newCall(request).execute().use { response ->
+                when (response.code) {
+                    200 -> {
+                        val jsonResponse = response.body?.string() ?: "{}"
+                        meterRegistry.counter("weather.api.success").increment()
+                        mapper.readValue(jsonResponse)
+                    }
+                    401 -> {
+                        meterRegistry.counter("weather.api.error", "type", "auth").increment()
+                        throw WeatherApiException("인증 실패", "INVALID_API_KEY")
+                    }
+                    404 -> {
+                        meterRegistry.counter("weather.api.error", "type", "not_found").increment() 
+                        throw WeatherApiException("도시를 찾을 수 없음", "CITY_NOT_FOUND")
+                    }
+                    429 -> {
+                        meterRegistry.counter("weather.api.error", "type", "rate_limit").increment()
+                        throw WeatherApiException("API 사용량 한도 초과", "RATE_LIMIT_EXCEEDED")
+                    }
+                    500, 502, 503, 504 -> {
+                        meterRegistry.counter("weather.api.error", "type", "server_error").increment()
+                        throw WeatherApiException("서버 오류", "SERVER_ERROR")
+                    }
+                    else -> {
+                        meterRegistry.counter("weather.api.error", "type", "unknown").increment()
+                        throw WeatherApiException("알 수 없는 오류", "UNKNOWN_ERROR")
+                    }
                 }
-                401 -> throw IllegalArgumentException("잘못된 API 키입니다. WEATHER_API_KEY를 확인해주세요.")
-                404 -> throw IllegalArgumentException("도시를 찾을 수 없습니다. 도시명을 확인해주세요.")
-                429 -> throw RuntimeException("API 사용량 한도를 초과했습니다. 잠시 후 다시 시도해주세요.")
-                500, 502, 503, 504 -> throw RuntimeException("날씨 서비스 일시 장애입니다. 잠시 후 다시 시도해주세요.")
-                else -> throw RuntimeException("예상치 못한 오류입니다: ${response.code} ${response.message}")
             }
+        } ?: throw WeatherApiException("응답 파싱 실패", "PARSE_ERROR")
+    }
+    
+    // API 키 마스킹 유틸리티
+    private fun maskApiKey(apiKey: String): String {
+        return if (apiKey.length > 8) {
+            "${apiKey.take(4)}****${apiKey.takeLast(4)}"
+        } else {
+            "****"
         }
     }
 }
+
+// 커스텀 예외 클래스
+class WeatherApiException(
+    message: String,
+    val errorCode: String,
+    cause: Throwable? = null
+) : RuntimeException(message, cause)
 
 // 날씨 정보 데이터 클래스
 data class WeatherInfo(
