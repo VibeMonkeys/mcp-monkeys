@@ -2,6 +2,8 @@ package com.monkeys.client.controller
 
 import com.monkeys.client.config.ConfigurationValidator
 import com.monkeys.client.config.McpServerUrls
+import com.monkeys.shared.circuit.SimpleCircuitBreakerRegistry
+import com.monkeys.shared.circuit.CircuitBreakerOpenException
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 import org.springframework.web.reactive.function.client.WebClient
@@ -10,6 +12,7 @@ import reactor.core.publisher.Mono
 import reactor.core.publisher.Mono.just as toMono
 import org.slf4j.LoggerFactory
 import java.time.Duration
+import io.micrometer.core.instrument.MeterRegistry
 
 @RestController
 @RequestMapping("/api/health")
@@ -17,7 +20,9 @@ import java.time.Duration
 class HealthController(
     private val configurationValidator: ConfigurationValidator,
     private val mcpServerUrls: McpServerUrls,
-    private val webClient: WebClient.Builder
+    private val webClient: WebClient.Builder,
+    private val circuitBreakerRegistry: SimpleCircuitBreakerRegistry,
+    private val meterRegistry: MeterRegistry
 ) {
     
     private val logger = LoggerFactory.getLogger(HealthController::class.java)
@@ -85,31 +90,60 @@ class HealthController(
     }
     
     private fun checkServerHealth(client: WebClient, name: String, url: String): Mono<Map<String, String>> {
-        return client.get()
-            .uri("$url/actuator/health")
-            .retrieve()
-            .bodyToMono(String::class.java)
-            .timeout(Duration.ofSeconds(5))
+        val circuitBreaker = circuitBreakerRegistry.getCircuitBreaker("mcp-$name")
+        val startTime = System.nanoTime()
+        
+        return try {
+            // Circuit Breaker로 감싸진 비동기 호출
+            Mono.fromCallable {
+                circuitBreaker.execute {
+                    client.get()
+                        .uri("$url/actuator/health")
+                        .retrieve()
+                        .bodyToMono(String::class.java)
+                        .timeout(Duration.ofSeconds(3))
+                        .block() // Circuit Breaker 내에서 동기 호출로 변환
+                }
+            }
             .map { 
+                val responseTime = Duration.ofNanos(System.nanoTime() - startTime).toMillis()
+                meterRegistry.timer("mcp.health.check", "server", name).record(responseTime, java.util.concurrent.TimeUnit.MILLISECONDS)
+                
                 mapOf(
                     "status" to "UP",
                     "url" to url,
-                    "responseTime" to "< 5s"
+                    "responseTime" to "${responseTime}ms",
+                    "circuitBreakerState" to circuitBreaker.getState().name
                 )
             }
-            .onErrorResume { error ->
-                logger.warn("MCP 서버 $name 연결 실패: ${error.message}")
-                
-                val errorInfo = when (error) {
-                    is WebClientResponseException -> "HTTP ${error.statusCode.value()}"
-                    else -> "Connection Failed"
-                }
-                
-                toMono(mapOf(
-                    "status" to "DOWN",
-                    "url" to url,
-                    "error" to errorInfo
-                ))
+        } catch (e: CircuitBreakerOpenException) {
+            logger.warn("MCP 서버 $name Circuit Breaker OPEN")
+            meterRegistry.counter("mcp.health.check.circuit_breaker_open", "server", name).increment()
+            
+            toMono(mapOf(
+                "status" to "DOWN",
+                "url" to url,
+                "error" to "Circuit Breaker Open",
+                "circuitBreakerState" to "OPEN"
+            ))
+        }.onErrorResume { error ->
+            val responseTime = Duration.ofNanos(System.nanoTime() - startTime).toMillis()
+            logger.warn("MCP 서버 $name 연결 실패 (${responseTime}ms): ${error.message}")
+            
+            val errorInfo = when (error) {
+                is WebClientResponseException -> "HTTP ${error.statusCode.value()}"
+                else -> "Connection Failed"
             }
+            
+            meterRegistry.counter("mcp.health.check.error", "server", name, "type", errorInfo).increment()
+            
+            toMono(mapOf(
+                "status" to "DOWN",
+                "url" to url,
+                "error" to errorInfo,
+                "responseTime" to "${responseTime}ms",
+                "circuitBreakerState" to circuitBreaker.getState().name
+            ))
+        }
     }
 }
