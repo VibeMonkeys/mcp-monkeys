@@ -25,14 +25,35 @@ news:
   api:
     key: ${NEWS_API_KEY:dummy-key}
 
+shared:
+  http-client:
+    connect-timeout-seconds: 10
+    read-timeout-seconds: 30
+    write-timeout-seconds: 30
+    max-idle-connections: 5
+    keep-alive-duration-minutes: 5
+    retry-on-connection-failure: true
+    user-agent: "1.0.0"
+
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,mcp
+        include: health,info,mcp,metrics,prometheus
   endpoint:
     health:
       show-details: always
+    metrics:
+      enabled: true
+    prometheus:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    distribution:
+      percentiles-histogram:
+        news.api.request: true
 
 logging:
   level:
