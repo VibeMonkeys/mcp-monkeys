@@ -6,7 +6,12 @@ spring:
     name: unified-mcp-client
   ai:
     openai:
-      api-key: ${OPENAI_API_KEY:dummy-key}
+      api-key: ${GEMINI_API_KEY:dummy-api-key}
+      base-url: https://generativelanguage.googleapis.com/v1beta/openai
+      chat:
+        completions-path: /chat/completions
+        options:
+          model: gemini-2.0-flash-exp
     mcp:
       client:
         enabled: true
