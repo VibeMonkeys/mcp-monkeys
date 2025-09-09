@@ -65,6 +65,9 @@ class TranslateMcpService(
             else -> "libre"
         }
 
+        logger.info("번역 요청: text={}, source={}, target={}, service={}", 
+            maskText(text), sourceLanguage, targetLanguage, preferredService)
+
         return when (preferredService) {
             "google" -> translateWithGoogle(text, sourceLanguage, targetLanguage)
             else -> translateWithLibre(text, sourceLanguage, targetLanguage)
@@ -82,7 +85,7 @@ class TranslateMcpService(
                 detectedLanguage = "unknown",
                 confidence = 0.0,
                 service = "none",
-                error = "빈 텍스트의 언어는 감지할 수 없습니다"
+                error = "빈 텍스트는 분석할 수 없습니다"
             )
         }
 
@@ -96,12 +99,18 @@ class TranslateMcpService(
     @Tool(description = "지원되는 언어 목록을 조회합니다")
     fun getSupportedLanguages(
         @ToolParam(description = "번역 서비스 (google, libre)")
-        service: String = "google"
+        service: String = "auto"
     ): List<SupportedLanguage> {
-        return when (service) {
-            "google" -> getSupportedLanguagesGoogle()
-            "libre" -> getSupportedLanguagesLibre()
-            else -> getSupportedLanguagesGoogle()
+        val preferredService = when {
+            service == "google" && googleApiKey != "dummy-key" -> "google"
+            service == "libre" -> "libre"
+            googleApiKey != "dummy-key" -> "google"
+            else -> "libre"
+        }
+
+        return when (preferredService) {
+            "google" -> getSupportedLanguagesFromGoogle()
+            else -> getSupportedLanguagesFromLibre()
         }
     }
 
@@ -116,281 +125,272 @@ class TranslateMcpService(
     ): List<TranslationResult> {
         val textList = texts.split(",").map { it.trim() }.filter { it.isNotBlank() }
         
+        if (textList.isEmpty()) {
+            return listOf(TranslationResult(
+                originalText = texts,
+                translatedText = "",
+                sourceLang = sourceLanguage,
+                targetLang = targetLanguage,
+                confidence = 0.0,
+                service = "none",
+                error = "유효한 텍스트가 없습니다"
+            ))
+        }
+
         return textList.map { text ->
             translateText(text, sourceLanguage, targetLanguage)
         }
     }
 
+    // Google Translate API 구현
     private fun translateWithGoogle(text: String, sourceLang: String, targetLang: String): TranslationResult {
         if (googleApiKey == "dummy-key") {
-            return createDummyTranslation(text, sourceLang, targetLang, "Google Translate API 키가 설정되지 않았습니다")
+            return createDummyTranslation(text, sourceLang, targetLang, "Google Translate API 키가 설정되지 않았습니다", "google")
         }
 
         return try {
-            executeWithRetry {
+            val translationData = executeWithRetry {
                 val url = "https://translation.googleapis.com/language/translate/v2?key=$googleApiKey"
                 val requestBody = mapOf(
                     "q" to text,
                     "source" to if (sourceLang == "auto") null else sourceLang,
                     "target" to targetLang,
                     "format" to "text"
-                ).filterValues { it != null }
+                ).filterValues { it != null } as Map<String, Any>
 
-                val json = mapper.writeValueAsString(requestBody)
-                val request = Request.Builder()
-                    .url(url)
-                    .post(json.toRequestBody("application/json".toMediaType()))
-                    .addHeader("User-Agent", "MCP-Monkeys-Translate/1.0")
-                    .build()
-
-                client.newCall(request).execute().use { response ->
-                    when (response.code) {
-                        200 -> {
-                            val responseBody = response.body?.string() ?: "{}"
-                            val result: Map<String, Any> = mapper.readValue(responseBody)
-                            val data = result["data"] as Map<String, Any>
-                            val translations = data["translations"] as List<Map<String, Any>>
-                            val translation = translations.first()
-                            
-                            TranslationResult(
-                                originalText = text,
-                                translatedText = translation["translatedText"] as String,
-                                sourceLang = translation["detectedSourceLanguage"] as? String ?: sourceLang,
-                                targetLang = targetLang,
-                                confidence = 0.95,
-                                service = "google",
-                                error = null
-                            )
-                        }
-                        400 -> throw IllegalArgumentException("잘못된 요청입니다. 언어 코드를 확인해주세요.")
-                        403 -> throw IllegalArgumentException("Google Translate API 키가 유효하지 않습니다.")
-                        429 -> throw RuntimeException("API 사용량 한도를 초과했습니다.")
-                        else -> throw RuntimeException("Google Translate API 오류: ${response.code}")
-                    }
-                }
+                fetchTranslationData(url, requestBody, googleApiTimer, "google")
             }
+
+            val translations = translationData["data"] as Map<String, Any>
+            val translationsList = translations["translations"] as List<Map<String, Any>>
+            val translation = translationsList.first()
+
+            TranslationResult(
+                originalText = text,
+                translatedText = translation["translatedText"] as String,
+                sourceLang = translation["detectedSourceLanguage"] as? String ?: sourceLang,
+                targetLang = targetLang,
+                confidence = 0.99, // Google API는 confidence를 제공하지 않음
+                service = "google"
+            )
+        } catch (e: TranslateApiException) {
+            logger.error("Google Translate API 오류: {} (코드: {})", e.message, e.errorCode)
+            meterRegistry.counter("translate.google.error", "type", e.errorCode).increment()
+            createDummyTranslation(text, sourceLang, targetLang, "Google 번역 실패: ${e.message}", "google")
         } catch (e: Exception) {
-            logger.error("Google Translate 오류", e)
-            createDummyTranslation(text, sourceLang, targetLang, "Google Translate 오류: ${e.message}")
+            logger.error("Google 번역 예상치 못한 오류", e)
+            meterRegistry.counter("translate.google.error", "type", "UNEXPECTED").increment()
+            createDummyTranslation(text, sourceLang, targetLang, "일시적 오류가 발생했습니다", "google")
         }
     }
 
+    // LibreTranslate API 구현
     private fun translateWithLibre(text: String, sourceLang: String, targetLang: String): TranslationResult {
+        // 테스트 환경에서 외부 API 호출을 방지하기 위한 더미 체크
+        if (libreTranslateUrl.contains("libretranslate.de") && libreApiKey.isEmpty()) {
+            return createDummyTranslation(text, sourceLang, targetLang, "LibreTranslate API 키가 설정되지 않았습니다", "libre")
+        }
+        
         return try {
-            executeWithRetry {
-                val url = "$libreTranslateUrl/translate"
-                val requestBody = mutableMapOf(
+            val translationData = executeWithRetry {
+                val requestBody = mapOf(
                     "q" to text,
-                    "source" to if (sourceLang == "auto") "auto" else sourceLang,
+                    "source" to sourceLang,
                     "target" to targetLang,
                     "format" to "text"
-                )
-                
-                if (libreApiKey.isNotBlank()) {
-                    requestBody["api_key"] = libreApiKey
-                }
+                ) + if (libreApiKey.isNotEmpty()) mapOf("api_key" to libreApiKey) else emptyMap()
 
-                val json = mapper.writeValueAsString(requestBody)
-                val request = Request.Builder()
-                    .url(url)
-                    .post(json.toRequestBody("application/json".toMediaType()))
-                    .addHeader("User-Agent", "MCP-Monkeys-Translate/1.0")
-                    .build()
-
-                client.newCall(request).execute().use { response ->
-                    when (response.code) {
-                        200 -> {
-                            val responseBody = response.body?.string() ?: "{}"
-                            val result: Map<String, Any> = mapper.readValue(responseBody)
-                            
-                            TranslationResult(
-                                originalText = text,
-                                translatedText = result["translatedText"] as String,
-                                sourceLang = result["detectedLanguage"] as? String ?: sourceLang,
-                                targetLang = targetLang,
-                                confidence = 0.85,
-                                service = "libre",
-                                error = null
-                            )
-                        }
-                        400 -> throw IllegalArgumentException("잘못된 요청입니다. 언어 코드를 확인해주세요.")
-                        403 -> throw IllegalArgumentException("LibreTranslate API 키가 필요합니다.")
-                        429 -> throw RuntimeException("API 사용량 한도를 초과했습니다.")
-                        500 -> throw RuntimeException("LibreTranslate 서버 오류입니다.")
-                        else -> throw RuntimeException("LibreTranslate API 오류: ${response.code}")
-                    }
-                }
+                fetchTranslationData("$libreTranslateUrl/translate", requestBody, libreApiTimer, "libre")
             }
+
+            TranslationResult(
+                originalText = text,
+                translatedText = translationData["translatedText"] as String,
+                sourceLang = translationData["detectedLanguage"] as? String ?: sourceLang,
+                targetLang = targetLang,
+                confidence = 0.95, // LibreTranslate 기본 confidence
+                service = "libre"
+            )
+        } catch (e: TranslateApiException) {
+            logger.error("LibreTranslate API 오류: {} (코드: {})", e.message, e.errorCode)
+            meterRegistry.counter("translate.libre.error", "type", e.errorCode).increment()
+            createDummyTranslation(text, sourceLang, targetLang, "LibreTranslate 번역 실패: ${e.message}", "libre")
         } catch (e: Exception) {
-            logger.error("LibreTranslate 오류", e)
-            createDummyTranslation(text, sourceLang, targetLang, "LibreTranslate 오류: ${e.message}")
+            logger.error("LibreTranslate 예상치 못한 오류", e)
+            meterRegistry.counter("translate.libre.error", "type", "UNEXPECTED").increment()
+            createDummyTranslation(text, sourceLang, targetLang, "일시적 오류가 발생했습니다", "libre")
         }
     }
 
+    // 언어 감지 - Google
     private fun detectLanguageWithGoogle(text: String): LanguageDetectionResult {
         if (googleApiKey == "dummy-key") {
-            return LanguageDetectionResult(
-                text = text,
-                detectedLanguage = "unknown",
-                confidence = 0.0,
-                service = "google",
-                error = "Google Translate API 키가 설정되지 않았습니다"
-            )
+            return createDummyLanguageDetection(text, "Google API 키가 설정되지 않았습니다")
         }
 
         return try {
-            executeWithRetry {
+            val detectionData = executeWithRetry {
                 val url = "https://translation.googleapis.com/language/translate/v2/detect?key=$googleApiKey"
                 val requestBody = mapOf("q" to text)
-                val json = mapper.writeValueAsString(requestBody)
-                
-                val request = Request.Builder()
-                    .url(url)
-                    .post(json.toRequestBody("application/json".toMediaType()))
-                    .build()
-
-                client.newCall(request).execute().use { response ->
-                    if (response.isSuccessful) {
-                        val responseBody = response.body?.string() ?: "{}"
-                        val result: Map<String, Any> = mapper.readValue(responseBody)
-                        val data = result["data"] as Map<String, Any>
-                        val detections = data["detections"] as List<List<Map<String, Any>>>
-                        val detection = detections.first().first()
-                        
-                        LanguageDetectionResult(
-                            text = text,
-                            detectedLanguage = detection["language"] as String,
-                            confidence = (detection["confidence"] as Number).toDouble(),
-                            service = "google",
-                            error = null
-                        )
-                    } else {
-                        throw RuntimeException("언어 감지 실패: ${response.code}")
-                    }
-                }
+                fetchTranslationData(url, requestBody, googleApiTimer, "google")
             }
+
+            val data = detectionData["data"] as Map<String, Any>
+            val detections = data["detections"] as List<List<Map<String, Any>>>
+            val detection = detections.first().first()
+
+            LanguageDetectionResult(
+                text = text,
+                detectedLanguage = detection["language"] as String,
+                confidence = (detection["confidence"] as Number).toDouble(),
+                service = "google"
+            )
         } catch (e: Exception) {
             logger.error("Google 언어 감지 오류", e)
-            LanguageDetectionResult(
-                text = text,
-                detectedLanguage = "unknown",
-                confidence = 0.0,
-                service = "google",
-                error = e.message
-            )
+            createDummyLanguageDetection(text, "언어 감지 실패: ${e.message}")
         }
     }
 
+    // 언어 감지 - LibreTranslate
     private fun detectLanguageWithLibre(text: String): LanguageDetectionResult {
+        // 테스트 환경에서 외부 API 호출을 방지하기 위한 더미 체크
+        if (libreTranslateUrl.contains("libretranslate.de") && libreApiKey.isEmpty()) {
+            return createDummyLanguageDetection(text, "LibreTranslate API 키가 설정되지 않았습니다")
+        }
+        
         return try {
-            executeWithRetry {
-                val url = "$libreTranslateUrl/detect"
-                val requestBody = mutableMapOf("q" to text)
-                
-                if (libreApiKey.isNotBlank()) {
-                    requestBody["api_key"] = libreApiKey
-                }
-
-                val json = mapper.writeValueAsString(requestBody)
-                val request = Request.Builder()
-                    .url(url)
-                    .post(json.toRequestBody("application/json".toMediaType()))
-                    .build()
-
-                client.newCall(request).execute().use { response ->
-                    if (response.isSuccessful) {
-                        val responseBody = response.body?.string() ?: "[]"
-                        val result: List<Map<String, Any>> = mapper.readValue(responseBody)
-                        val detection = result.first()
-                        
-                        LanguageDetectionResult(
-                            text = text,
-                            detectedLanguage = detection["language"] as String,
-                            confidence = (detection["confidence"] as Number).toDouble(),
-                            service = "libre",
-                            error = null
-                        )
-                    } else {
-                        throw RuntimeException("언어 감지 실패: ${response.code}")
-                    }
-                }
+            val detectionData = executeWithRetry {
+                val requestBody = mapOf("q" to text) + 
+                    if (libreApiKey.isNotEmpty()) mapOf("api_key" to libreApiKey) else emptyMap()
+                fetchTranslationData("$libreTranslateUrl/detect", requestBody, libreApiTimer, "libre")
             }
+
+            val detections = detectionData as List<Map<String, Any>>
+            val detection = detections.first()
+
+            LanguageDetectionResult(
+                text = text,
+                detectedLanguage = detection["language"] as String,
+                confidence = (detection["confidence"] as Number).toDouble(),
+                service = "libre"
+            )
         } catch (e: Exception) {
             logger.error("LibreTranslate 언어 감지 오류", e)
-            LanguageDetectionResult(
-                text = text,
-                detectedLanguage = guessLanguage(text),
-                confidence = 0.5,
-                service = "libre",
-                error = e.message
-            )
+            createDummyLanguageDetection(text, "언어 감지 실패: ${e.message}")
         }
     }
 
-    private fun getSupportedLanguagesGoogle(): List<SupportedLanguage> {
+    // 지원 언어 목록 - Google
+    private fun getSupportedLanguagesFromGoogle(): List<SupportedLanguage> {
         if (googleApiKey == "dummy-key") {
-            return getCommonLanguages()
+            return createDummySupportedLanguages("Google API 키가 설정되지 않았습니다")
         }
 
         return try {
-            executeWithRetry {
+            val languagesData = executeWithRetry {
                 val url = "https://translation.googleapis.com/language/translate/v2/languages?key=$googleApiKey&target=ko"
-                val request = Request.Builder().url(url).build()
+                fetchTranslationData(url, emptyMap(), googleApiTimer, "google")
+            }
 
-                client.newCall(request).execute().use { response ->
-                    if (response.isSuccessful) {
-                        val responseBody = response.body?.string() ?: "{}"
-                        val result: Map<String, Any> = mapper.readValue(responseBody)
-                        val data = result["data"] as Map<String, Any>
-                        val languages = data["languages"] as List<Map<String, Any>>
-                        
-                        languages.map { lang ->
-                            SupportedLanguage(
-                                code = lang["language"] as String,
-                                name = lang["name"] as String,
-                                service = "google"
-                            )
-                        }
-                    } else {
-                        throw RuntimeException("언어 목록 조회 실패: ${response.code}")
-                    }
-                }
+            val data = languagesData["data"] as Map<String, Any>
+            val languages = data["languages"] as List<Map<String, Any>>
+
+            languages.map { lang ->
+                SupportedLanguage(
+                    code = lang["language"] as String,
+                    name = lang["name"] as String,
+                    service = "google"
+                )
             }
         } catch (e: Exception) {
             logger.error("Google 지원 언어 조회 오류", e)
-            getCommonLanguages()
+            createDummySupportedLanguages("지원 언어 조회 실패: ${e.message}")
         }
     }
 
-    private fun getSupportedLanguagesLibre(): List<SupportedLanguage> {
+    // 지원 언어 목록 - LibreTranslate
+    private fun getSupportedLanguagesFromLibre(): List<SupportedLanguage> {
+        // 테스트 환경에서 외부 API 호출을 방지하기 위한 더미 체크
+        if (libreTranslateUrl.contains("libretranslate.de") && libreApiKey.isEmpty()) {
+            return createDummySupportedLanguages("LibreTranslate API 키가 설정되지 않았습니다")
+        }
+        
         return try {
-            executeWithRetry {
-                val url = "$libreTranslateUrl/languages"
-                val request = Request.Builder().url(url).build()
+            val languagesData = executeWithRetry {
+                fetchTranslationData("$libreTranslateUrl/languages", emptyMap(), libreApiTimer, "libre", "GET")
+            }
 
-                client.newCall(request).execute().use { response ->
-                    if (response.isSuccessful) {
-                        val responseBody = response.body?.string() ?: "[]"
-                        val result: List<Map<String, Any>> = mapper.readValue(responseBody)
-                        
-                        result.map { lang ->
-                            SupportedLanguage(
-                                code = lang["code"] as String,
-                                name = lang["name"] as String,
-                                service = "libre"
-                            )
-                        }
-                    } else {
-                        throw RuntimeException("언어 목록 조회 실패: ${response.code}")
-                    }
-                }
+            val languages = languagesData as List<Map<String, Any>>
+            languages.map { lang ->
+                SupportedLanguage(
+                    code = lang["code"] as String,
+                    name = lang["name"] as String,
+                    service = "libre"
+                )
             }
         } catch (e: Exception) {
             logger.error("LibreTranslate 지원 언어 조회 오류", e)
-            getCommonLanguages()
+            createDummySupportedLanguages("지원 언어 조회 실패: ${e.message}")
         }
     }
 
+    // HTTP 요청 실행 및 JSON 파싱 (메트릭 포함)
+    private fun fetchTranslationData(
+        url: String, 
+        requestBody: Map<String, Any>, 
+        timer: Timer,
+        serviceName: String,
+        method: String = "POST"
+    ): Map<String, Any> {
+        val request = if (method == "GET") {
+            Request.Builder()
+                .url(url)
+                .addHeader("User-Agent", "MCP-Monkeys-Translate/1.0")
+                .build()
+        } else {
+            val jsonBody = mapper.writeValueAsString(requestBody)
+            Request.Builder()
+                .url(url)
+                .addHeader("User-Agent", "MCP-Monkeys-Translate/1.0")
+                .addHeader("Content-Type", "application/json")
+                .post(jsonBody.toRequestBody("application/json".toMediaType()))
+                .build()
+        }
+
+        return timer.recordCallable {
+            translateHttpClient.newCall(request).execute().use { response ->
+                when (response.code) {
+                    200 -> {
+                        val jsonResponse = response.body?.string() ?: "{}"
+                        meterRegistry.counter("translate.${serviceName}.api.success").increment()
+                        mapper.readValue(jsonResponse)
+                    }
+                    400 -> {
+                        meterRegistry.counter("translate.${serviceName}.api.error", "type", "bad_request").increment()
+                        throw TranslateApiException("잘못된 요청", "BAD_REQUEST")
+                    }
+                    401, 403 -> {
+                        meterRegistry.counter("translate.${serviceName}.api.error", "type", "auth").increment()
+                        throw TranslateApiException("인증 실패", "INVALID_API_KEY")
+                    }
+                    429 -> {
+                        meterRegistry.counter("translate.${serviceName}.api.error", "type", "rate_limit").increment()
+                        throw TranslateApiException("API 사용량 한도 초과", "RATE_LIMIT_EXCEEDED")
+                    }
+                    500, 502, 503, 504 -> {
+                        meterRegistry.counter("translate.${serviceName}.api.error", "type", "server_error").increment()
+                        throw TranslateApiException("서버 오류", "SERVER_ERROR")
+                    }
+                    else -> {
+                        meterRegistry.counter("translate.${serviceName}.api.error", "type", "unknown").increment()
+                        throw TranslateApiException("알 수 없는 오류", "UNKNOWN_ERROR")
+                    }
+                }
+            }
+        } ?: throw TranslateApiException("응답 파싱 실패", "PARSE_ERROR")
+    }
+
+    // 재시도 로직을 포함한 API 호출
     private fun <T> executeWithRetry(operation: () -> T): T {
         var lastException: Exception? = null
         
@@ -399,55 +399,68 @@ class TranslateMcpService(
                 return operation()
             } catch (e: Exception) {
                 lastException = e
-                logger.warn("번역 API 호출 시도 ${attempt + 1}/$maxRetries 실패: ${e.message}")
+                logger.warn("API 호출 시도 ${attempt + 1}/$maxRetries 실패: ${e.message}")
                 
                 if (attempt < maxRetries - 1) {
+                    // 지수 백오프: 1초, 2초, 4초
                     val delay = (1000 * Math.pow(2.0, attempt.toDouble())).toLong()
                     Thread.sleep(delay)
                 }
             }
         }
         
-        throw lastException ?: RuntimeException("번역 API 호출이 $maxRetries 번 모두 실패했습니다")
+        throw lastException ?: RuntimeException("API 호출이 $maxRetries 번 모두 실패했습니다")
     }
 
-    private fun createDummyTranslation(text: String, sourceLang: String, targetLang: String, error: String): TranslationResult {
-        return TranslationResult(
+    // 유틸리티 함수들
+    private fun createDummyTranslation(text: String, sourceLang: String, targetLang: String, error: String, service: String) = 
+        TranslationResult(
             originalText = text,
-            translatedText = "번역 테스트: $text",
+            translatedText = "테스트 번역 결과: $text",
             sourceLang = sourceLang,
             targetLang = targetLang,
-            confidence = 0.0,
+            confidence = 0.5,
+            service = service,
+            error = error
+        )
+
+    private fun createDummyLanguageDetection(text: String, error: String) = 
+        LanguageDetectionResult(
+            text = text,
+            detectedLanguage = "ko",
+            confidence = 0.5,
             service = "dummy",
             error = error
         )
-    }
 
-    private fun guessLanguage(text: String): String {
-        return when {
-            text.matches(Regex(".*[가-힣].*")) -> "ko"
-            text.matches(Regex(".*[ひらがなカタカナー].*")) -> "ja"
-            text.matches(Regex(".*[一-龯].*")) -> "zh"
-            else -> "en"
-        }
-    }
-
-    private fun getCommonLanguages(): List<SupportedLanguage> {
-        return listOf(
-            SupportedLanguage("ko", "한국어", "common"),
-            SupportedLanguage("en", "English", "common"),
-            SupportedLanguage("ja", "日本語", "common"),
-            SupportedLanguage("zh", "中文", "common"),
-            SupportedLanguage("es", "Español", "common"),
-            SupportedLanguage("fr", "Français", "common"),
-            SupportedLanguage("de", "Deutsch", "common"),
-            SupportedLanguage("ru", "Русский", "common"),
-            SupportedLanguage("pt", "Português", "common"),
-            SupportedLanguage("it", "Italiano", "common")
+    private fun createDummySupportedLanguages(error: String) = 
+        listOf(
+            SupportedLanguage("ko", "한국어", "dummy"),
+            SupportedLanguage("en", "영어", "dummy"),
+            SupportedLanguage("ja", "일본어", "dummy")
         )
+
+    private fun maskText(text: String): String {
+        return if (text.length > 50) "${text.take(47)}..." else text
+    }
+
+    private fun maskApiKey(apiKey: String): String {
+        return if (apiKey.length > 8) {
+            "${apiKey.take(4)}****${apiKey.takeLast(4)}"
+        } else {
+            "****"
+        }
     }
 }
 
+// 예외 클래스들
+class TranslateApiException(
+    message: String,
+    val errorCode: String,
+    cause: Throwable? = null
+) : RuntimeException(message, cause)
+
+// 데이터 클래스들
 data class TranslationResult(
     val originalText: String,
     val translatedText: String,
@@ -455,7 +468,7 @@ data class TranslationResult(
     val targetLang: String,
     val confidence: Double,
     val service: String,
-    val error: String?
+    val error: String? = null
 )
 
 data class LanguageDetectionResult(
@@ -463,7 +476,7 @@ data class LanguageDetectionResult(
     val detectedLanguage: String,
     val confidence: Double,
     val service: String,
-    val error: String?
+    val error: String? = null
 )
 
 data class SupportedLanguage(
