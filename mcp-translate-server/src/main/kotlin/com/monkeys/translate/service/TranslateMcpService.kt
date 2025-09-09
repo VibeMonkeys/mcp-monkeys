@@ -10,22 +10,30 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import org.slf4j.LoggerFactory
+import io.micrometer.core.instrument.MeterRegistry
+import io.micrometer.core.instrument.Timer
 import java.util.concurrent.TimeUnit
 
 @Service
 class TranslateMcpService(
     @Value("\${google.translate.api.key:dummy-key}") private val googleApiKey: String,
     @Value("\${libretranslate.api.url:https://libretranslate.de}") private val libreTranslateUrl: String,
-    @Value("\${libretranslate.api.key:}") private val libreApiKey: String
+    @Value("\${libretranslate.api.key:}") private val libreApiKey: String,
+    private val translateHttpClient: OkHttpClient,
+    private val meterRegistry: MeterRegistry
 ) {
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .retryOnConnectionFailure(true)
-        .build()
     private val mapper = jacksonObjectMapper()
     private val logger = LoggerFactory.getLogger(TranslateMcpService::class.java)
     private val maxRetries = 3
+    
+    // 메트릭 타이머
+    private val googleApiTimer = Timer.builder("translate.google.api.request")
+        .description("Google Translate API 요청 시간")
+        .register(meterRegistry)
+    
+    private val libreApiTimer = Timer.builder("translate.libre.api.request")
+        .description("LibreTranslate API 요청 시간")
+        .register(meterRegistry)
 
     @Tool(description = "텍스트를 번역합니다. Google Translate API 또는 LibreTranslate를 사용합니다")
     fun translateText(
