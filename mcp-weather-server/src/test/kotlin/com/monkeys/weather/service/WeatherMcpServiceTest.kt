@@ -1,5 +1,7 @@
 package com.monkeys.weather.service
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
+import okhttp3.OkHttpClient
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
@@ -18,7 +20,11 @@ class WeatherMcpServiceTest {
         @DisplayName("현재 날씨 조회 - API 키 미설정")
         fun `should return dummy weather when api key is not set`() {
             // Given
-            val service = WeatherMcpService("dummy-key")
+            val service = WeatherMcpService(
+                "dummy-key", 
+                OkHttpClient(),
+                SimpleMeterRegistry()
+            )
             
             // When
             val weather = service.getCurrentWeather("Seoul")
@@ -32,7 +38,7 @@ class WeatherMcpServiceTest {
             assertEquals(60, weather.humidity)
             assertEquals(1013, weather.pressure)
             assertTrue(weather.description.contains("테스트 날씨"))
-            assertTrue(weather.description.contains("OpenWeatherMap API 키가 설정되지 않았습니다"))
+            assertTrue(weather.description.contains("API 키가 설정되지 않았습니다"))
             assertEquals("Clear", weather.main)
             assertEquals(3.5, weather.windSpeed)
             assertEquals(180, weather.windDirection)
@@ -44,7 +50,11 @@ class WeatherMcpServiceTest {
         @DisplayName("날씨 예보 조회 - API 키 미설정")
         fun `should return dummy forecast when api key is not set`() {
             // Given
-            val service = WeatherMcpService("dummy-key")
+            val service = WeatherMcpService(
+                "dummy-key", 
+                OkHttpClient(),
+                SimpleMeterRegistry()
+            )
             
             // When
             val forecast = service.getWeatherForecast("Tokyo")
@@ -67,7 +77,11 @@ class WeatherMcpServiceTest {
         @DisplayName("도시 날씨 비교 - API 키 미설정")
         fun `should return dummy weather comparison when api key is not set`() {
             // Given
-            val service = WeatherMcpService("dummy-key")
+            val service = WeatherMcpService(
+                "dummy-key", 
+                OkHttpClient(),
+                SimpleMeterRegistry()
+            )
             
             // When
             val comparison = service.compareWeather("Seoul, Tokyo, New York")
@@ -95,7 +109,11 @@ class WeatherMcpServiceTest {
         @DisplayName("현재 날씨 - 다른 단위")
         fun `should handle different units for current weather`() {
             // Given
-            val service = WeatherMcpService("dummy-key")
+            val service = WeatherMcpService(
+                "dummy-key", 
+                OkHttpClient(),
+                SimpleMeterRegistry()
+            )
             
             // When
             val weatherMetric = service.getCurrentWeather("Seoul", "metric")
@@ -112,7 +130,11 @@ class WeatherMcpServiceTest {
         @DisplayName("날씨 예보 - 다른 개수")
         fun `should handle different forecast counts`() {
             // Given
-            val service = WeatherMcpService("dummy-key")
+            val service = WeatherMcpService(
+                "dummy-key", 
+                OkHttpClient(),
+                SimpleMeterRegistry()
+            )
             
             // When
             val forecast = service.getWeatherForecast("Seoul", "metric", 1)
@@ -130,7 +152,11 @@ class WeatherMcpServiceTest {
         @DisplayName("도시 이름 공백 처리")
         fun `should handle whitespace in city names for comparison`() {
             // Given
-            val service = WeatherMcpService("dummy-key")
+            val service = WeatherMcpService(
+                "dummy-key", 
+                OkHttpClient(),
+                SimpleMeterRegistry()
+            )
             
             // When
             val comparison = service.compareWeather(" Seoul , Tokyo,  New York ")
@@ -146,7 +172,11 @@ class WeatherMcpServiceTest {
         @DisplayName("단일 도시 비교")
         fun `should handle single city comparison`() {
             // Given
-            val service = WeatherMcpService("dummy-key")
+            val service = WeatherMcpService(
+                "dummy-key", 
+                OkHttpClient(),
+                SimpleMeterRegistry()
+            )
             
             // When
             val comparison = service.compareWeather("Seoul")
