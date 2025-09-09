@@ -1,6 +1,7 @@
 import { cn } from "./ui/utils";
 import { Avatar, AvatarFallback } from "./ui/avatar";
-import { User, Bot, CheckCheck, Clock, AlertCircle } from "lucide-react";
+import { Badge } from "./ui/badge";
+import { User, Bot, CheckCheck, Clock, AlertCircle, Wrench } from "lucide-react";
 import { motion } from "motion/react";
 
 export interface Message {
@@ -8,7 +9,9 @@ export interface Message {
   content: string;
   timestamp: Date;
   sender: 'user' | 'assistant';
+  type: 'text' | 'error';
   status?: 'sending' | 'sent' | 'error';
+  toolsUsed?: string[];
 }
 
 interface MessageBubbleProps {
@@ -52,7 +55,9 @@ export function MessageBubble({ message }: MessageBubbleProps) {
           "relative rounded-2xl px-6 py-4 max-w-[85%] shadow-lg",
           isUser 
             ? "bg-gradient-to-br from-blue-500 to-purple-600 text-white ml-8" 
-            : "bg-white border border-slate-200/50 text-slate-800 mr-8"
+            : message.type === 'error'
+              ? "bg-red-50 border border-red-200 text-red-800 mr-8"
+              : "bg-white border border-slate-200/50 text-slate-800 mr-8"
         )}>
           {/* Glass effect for user messages */}
           {isUser && (
@@ -62,6 +67,21 @@ export function MessageBubble({ message }: MessageBubbleProps) {
           {/* Content */}
           <div className="relative z-10">
             <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
+            
+            {/* Tools Used */}
+            {message.toolsUsed && message.toolsUsed.length > 0 && (
+              <div className="mt-3 pt-3 border-t border-white/20">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Wrench className="h-3 w-3 opacity-70" />
+                  <span className="text-xs opacity-70">사용된 도구:</span>
+                  {message.toolsUsed.map((tool, index) => (
+                    <Badge key={index} variant="secondary" className="text-xs px-2 py-0.5">
+                      {tool}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
           
           {/* Message tail */}
@@ -69,7 +89,9 @@ export function MessageBubble({ message }: MessageBubbleProps) {
             "absolute w-3 h-3 transform rotate-45",
             isUser 
               ? "bg-gradient-to-br from-blue-500 to-purple-600 -right-1 bottom-4"
-              : "bg-white border-l border-b border-slate-200/50 -left-1 bottom-4"
+              : message.type === 'error'
+                ? "bg-red-50 border-l border-b border-red-200 -left-1 bottom-4"
+                : "bg-white border-l border-b border-slate-200/50 -left-1 bottom-4"
           )} />
         </div>
         
