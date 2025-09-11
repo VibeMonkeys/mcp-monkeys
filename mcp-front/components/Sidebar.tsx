@@ -3,17 +3,13 @@ import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Separator } from "./ui/separator";
-import { ScrollArea } from "./ui/scroll-area";
 import { 
-  MessageSquare, 
   Settings, 
   Activity, 
   Database, 
-  Shield, 
   Plus,
   ChevronLeft,
   ChevronRight,
-  Circle,
   Server,
   CheckCircle,
   AlertCircle,

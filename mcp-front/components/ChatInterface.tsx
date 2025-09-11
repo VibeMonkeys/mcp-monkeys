@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Separator } from "./ui/separator";
 import { toast } from "sonner";
 import { motion } from "motion/react";
-import { Server, Zap, Clock, AlertCircle, CheckCircle, RefreshCw, Activity } from "lucide-react";
+import { Server, Zap, AlertCircle, CheckCircle, RefreshCw, Activity } from "lucide-react";
 import { mcpApi, McpHealthResponse, McpComprehensiveHealth } from "../services/mcpApi";
 
 export function ChatInterface() {
@@ -322,7 +322,12 @@ export function ChatInterface() {
               <div className="max-w-4xl mx-auto">
                 <MessageInput
                   onSendMessage={handleSendMessage}
-                  isLoading={isLoading}
+                  isProcessing={isLoading}
+                  onStopProcessing={() => {
+                    if (abortControllerRef.current) {
+                      abortControllerRef.current.abort();
+                    }
+                  }}
                   disabled={connectionStatus !== 'connected'}
                   placeholder={
                     connectionStatus === 'connected' 

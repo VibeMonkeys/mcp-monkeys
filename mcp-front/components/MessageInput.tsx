@@ -9,13 +9,15 @@ interface MessageInputProps {
   disabled?: boolean;
   isProcessing?: boolean;
   onStopProcessing?: () => void;
+  placeholder?: string;
 }
 
 export function MessageInput({ 
   onSendMessage, 
   disabled = false, 
   isProcessing = false,
-  onStopProcessing 
+  onStopProcessing,
+  placeholder = "메시지를 입력하세요..."
 }: MessageInputProps) {
   const [message, setMessage] = useState("");
 
@@ -43,7 +45,7 @@ export function MessageInput({
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               onKeyPress={handleKeyPress}
-              placeholder="메시지를 입력하세요..."
+              placeholder={placeholder}
               disabled={disabled}
               className="min-h-[60px] max-h-[120px] resize-none border-0 bg-transparent px-6 py-4 pr-32 text-slate-800 placeholder:text-slate-400 focus:ring-0 focus:outline-none"
             />
