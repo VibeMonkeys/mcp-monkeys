@@ -1,6 +1,7 @@
 package com.monkeys.client.service
 
 import com.monkeys.shared.dto.*
+import com.monkeys.client.dto.MultiServiceResponse
 import org.springframework.ai.chat.client.ChatClient
 import org.springframework.ai.converter.BeanOutputConverter
 import org.springframework.stereotype.Service
