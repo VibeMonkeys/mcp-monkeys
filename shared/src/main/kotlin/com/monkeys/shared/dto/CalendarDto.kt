@@ -112,25 +112,6 @@ data class UpdateEventRequest(
     val reminderMinutes: List<Int>? = null
 )
 
-/**
- * 캘린더 조회 요청 DTO
- */
-data class CalendarEventsRequest(
-    @JsonPropertyDescription("시작 날짜 (YYYY-MM-DD)")
-    val startDate: String,
-    
-    @JsonPropertyDescription("종료 날짜 (YYYY-MM-DD)")
-    val endDate: String,
-    
-    @JsonPropertyDescription("최대 결과 수")
-    val maxResults: Int = 50,
-    
-    @JsonPropertyDescription("검색 키워드")
-    val searchQuery: String? = null,
-    
-    @JsonPropertyDescription("캘린더 ID")
-    val calendarId: String = "primary"
-)
 
 /**
  * 캘린더 응답 DTO (클라이언트용)
@@ -195,4 +176,118 @@ data class AvailabilityResponse(
     
     @JsonPropertyDescription("조회 기간")
     val searchPeriod: String
+)
+
+/**
+ * 캘린더 이벤트 생성 요청 (MCP용)
+ */
+data class CalendarEventRequest(
+    @JsonPropertyDescription("이벤트 제목")
+    val title: String,
+    
+    @JsonPropertyDescription("이벤트 날짜 (YYYY-MM-DD)")
+    val date: String,
+    
+    @JsonPropertyDescription("이벤트 시작 시간 (HH:MM)")
+    val startTime: String = "09:00",
+    
+    @JsonPropertyDescription("이벤트 종료 시간 (HH:MM)")
+    val endTime: String = "10:00",
+    
+    @JsonPropertyDescription("이벤트 설명")
+    val description: String = "",
+    
+    @JsonPropertyDescription("캘린더 ID")
+    val calendarId: String = "primary"
+)
+
+/**
+ * 캘린더 이벤트 조회 요청 (MCP용)
+ */
+data class CalendarEventsRequest(
+    @JsonPropertyDescription("조회 시작 날짜 (YYYY-MM-DD)")
+    val startDate: String? = null,
+    
+    @JsonPropertyDescription("조회 종료 날짜 (YYYY-MM-DD)")
+    val endDate: String? = null,
+    
+    @JsonPropertyDescription("최대 조회 개수")
+    val maxResults: Int = 10,
+    
+    @JsonPropertyDescription("캘린더 ID")
+    val calendarId: String = "primary"
+)
+
+/**
+ * 캘린더 이벤트 삭제 요청 (MCP용)
+ */
+data class CalendarDeleteRequest(
+    @JsonPropertyDescription("삭제할 이벤트 ID")
+    val eventId: String,
+    
+    @JsonPropertyDescription("캘린더 ID")
+    val calendarId: String = "primary"
+)
+
+/**
+ * 캘린더 이벤트 결과 (MCP용)
+ */
+data class CalendarEventResult(
+    @JsonPropertyDescription("이벤트 ID")
+    val id: String,
+    
+    @JsonPropertyDescription("이벤트 제목")
+    val title: String,
+    
+    @JsonPropertyDescription("이벤트 날짜")
+    val date: String,
+    
+    @JsonPropertyDescription("시작 시간")
+    val startTime: String,
+    
+    @JsonPropertyDescription("종료 시간")
+    val endTime: String,
+    
+    @JsonPropertyDescription("상태")
+    val status: String,
+    
+    @JsonPropertyDescription("HTML 링크")
+    val htmlLink: String? = null,
+    
+    @JsonPropertyDescription("설명")
+    val description: String? = null,
+    
+    @JsonPropertyDescription("에러 메시지")
+    val error: String? = null
+)
+
+/**
+ * 캘린더 삭제 결과 (MCP용)
+ */
+data class CalendarDeleteResult(
+    @JsonPropertyDescription("이벤트 ID")
+    val eventId: String,
+    
+    @JsonPropertyDescription("삭제 상태")
+    val status: String,
+    
+    @JsonPropertyDescription("에러 메시지")
+    val error: String? = null
+)
+
+/**
+ * 캘린더 정보 (MCP용)
+ */
+data class CalendarInfo(
+    @JsonPropertyDescription("캘린더 ID")
+    val id: String,
+    
+    @JsonPropertyDescription("캘린더 이름")
+    val name: String,
+    
+    @JsonPropertyDescription("설명")
+    val description: String,
+    
+    @JsonPropertyDescription("시간대")
+    val timeZone: String
 )

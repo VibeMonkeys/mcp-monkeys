@@ -57,7 +57,9 @@
       "mcp__serena__search_for_pattern",
       "Bash(./stop-all-servers.sh:*)",
       "Bash(./start-all-servers.sh:*)",
-      "mcp__serena__create_text_file"
+      "mcp__serena__create_text_file",
+      "mcp__serena__execute_shell_command",
+      "Bash(GOOGLE_CLOUD_PROJECT=\"gen-lang-client-0311835119\" GOOGLE_CLOUD_LOCATION=\"asia-northeast1\" java -jar build/libs/mcp-client-0.0.1-SNAPSHOT.jar)"
     ],
     "deny": [],
     "ask": []

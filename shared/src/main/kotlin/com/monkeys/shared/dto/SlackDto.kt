@@ -130,25 +130,3 @@ data class SlackSendResult(
     val error: String?
 )
 
-@JsonClassDescription("API 상태 확인 결과")
-data class ApiStatusResult(
-    @JsonProperty(required = true)
-    @JsonPropertyDescription("GitHub API 상태")
-    val github: String,
-    
-    @JsonProperty(required = true)
-    @JsonPropertyDescription("Jira API 상태")
-    val jira: String,
-    
-    @JsonProperty(required = true)
-    @JsonPropertyDescription("Gmail API 상태")
-    val gmail: String,
-    
-    @JsonProperty(required = true)
-    @JsonPropertyDescription("Slack API 상태")
-    val slack: String,
-    
-    @JsonProperty(required = true)
-    @JsonPropertyDescription("확인 시간")
-    val timestamp: Long
-)

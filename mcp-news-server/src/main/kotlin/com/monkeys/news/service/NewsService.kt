@@ -2,6 +2,7 @@ package com.monkeys.news.service
 
 import com.monkeys.news.repository.NewsRepository
 import com.monkeys.shared.dto.*
+import com.monkeys.shared.exception.BusinessException
 import org.springframework.stereotype.Service
 import org.slf4j.LoggerFactory
 import kotlinx.coroutines.runBlocking
@@ -24,7 +25,7 @@ class NewsService(
             newsRepository.getTopHeadlines(request)
         } catch (e: Exception) {
             logger.error("뉴스 헤드라인 조회 실패", e)
-            throw NewsServiceException("뉴스 헤드라인을 조회할 수 없습니다: ${e.message}", "HEADLINES_FETCH_FAILED", e)
+            throw BusinessException("뉴스 헤드라인을 조회할 수 없습니다: ${e.message}", "HEADLINES_FETCH_FAILED", e)
         }
     }
     
@@ -37,7 +38,7 @@ class NewsService(
             newsRepository.searchNews(request)
         } catch (e: Exception) {
             logger.error("뉴스 검색 실패", e)
-            throw NewsServiceException("뉴스 검색을 실행할 수 없습니다: ${e.message}", "SEARCH_FAILED", e)
+            throw BusinessException("뉴스 검색을 실행할 수 없습니다: ${e.message}", "SEARCH_FAILED", e)
         }
     }
     
@@ -50,7 +51,7 @@ class NewsService(
             newsRepository.getNewsBySource(request)
         } catch (e: Exception) {
             logger.error("출처별 뉴스 조회 실패", e)
-            throw NewsServiceException("출처별 뉴스를 조회할 수 없습니다: ${e.message}", "SOURCE_FETCH_FAILED", e)
+            throw BusinessException("출처별 뉴스를 조회할 수 없습니다: ${e.message}", "SOURCE_FETCH_FAILED", e)
         }
     }
     
@@ -85,34 +86,29 @@ class NewsService(
     // 검증 메소드들
     private fun validateHeadlinesRequest(request: NewsHeadlinesRequest) {
         if (request.pageSize < 1 || request.pageSize > 100) {
-            throw NewsServiceException("페이지 크기는 1-100 사이여야 합니다", "INVALID_PAGE_SIZE")
+            throw BusinessException("페이지 크기는 1-100 사이여야 합니다", "INVALID_PAGE_SIZE")
         }
     }
     
     private fun validateSearchRequest(request: NewsSearchRequest) {
         if (request.query.isBlank()) {
-            throw NewsServiceException("검색 키워드가 필요합니다", "QUERY_REQUIRED")
+            throw BusinessException("검색 키워드가 필요합니다", "QUERY_REQUIRED")
         }
         if (request.query.length > 500) {
-            throw NewsServiceException("검색 키워드가 너무 깁니다", "QUERY_TOO_LONG")
+            throw BusinessException("검색 키워드가 너무 깁니다", "QUERY_TOO_LONG")
         }
         if (request.pageSize < 1 || request.pageSize > 100) {
-            throw NewsServiceException("페이지 크기는 1-100 사이여야 합니다", "INVALID_PAGE_SIZE")
+            throw BusinessException("페이지 크기는 1-100 사이여야 합니다", "INVALID_PAGE_SIZE")
         }
     }
     
     private fun validateSourceRequest(request: NewsBySourceRequest) {
         if (request.source.isBlank()) {
-            throw NewsServiceException("출처가 필요합니다", "SOURCE_REQUIRED")
+            throw BusinessException("출처가 필요합니다", "SOURCE_REQUIRED")
         }
         if (request.pageSize < 1 || request.pageSize > 100) {
-            throw NewsServiceException("페이지 크기는 1-100 사이여야 합니다", "INVALID_PAGE_SIZE")
+            throw BusinessException("페이지 크기는 1-100 사이여야 합니다", "INVALID_PAGE_SIZE")
         }
     }
 }
 
-class NewsServiceException(
-    message: String,
-    val errorCode: String,
-    cause: Throwable? = null
-) : RuntimeException(message, cause)

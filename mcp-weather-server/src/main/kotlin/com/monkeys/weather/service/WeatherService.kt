@@ -2,9 +2,10 @@ package com.monkeys.weather.service
 
 import com.monkeys.weather.repository.WeatherRepository
 import com.monkeys.shared.dto.*
+import com.monkeys.shared.exception.BusinessException
 import org.springframework.stereotype.Service
 import org.slf4j.LoggerFactory
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.*
 
 /**
  * 날씨 비즈니스 로직 서비스
@@ -29,7 +30,7 @@ class WeatherService(
             weatherRepository.getCurrentWeather(request.city, request.units)
         } catch (e: Exception) {
             logger.error("날씨 조회 실패: city=${request.city}", e)
-            throw WeatherServiceException("날씨 정보를 조회할 수 없습니다: ${e.message}", "WEATHER_FETCH_FAILED", e)
+            throw BusinessException("날씨 정보를 조회할 수 없습니다: ${e.message}", "WEATHER_FETCH_FAILED", e)
         }
     }
     
@@ -47,7 +48,7 @@ class WeatherService(
             weatherRepository.getWeatherForecast(request.city, request.units, request.count)
         } catch (e: Exception) {
             logger.error("날씨 예보 조회 실패: city=${request.city}", e)
-            throw WeatherServiceException("날씨 예보를 조회할 수 없습니다: ${e.message}", "FORECAST_FETCH_FAILED", e)
+            throw BusinessException("날씨 예보를 조회할 수 없습니다: ${e.message}", "FORECAST_FETCH_FAILED", e)
         }
     }
     
@@ -59,11 +60,11 @@ class WeatherService(
         validateUnits(request.units)
         
         if (cities.isEmpty()) {
-            throw WeatherServiceException("비교할 도시가 지정되지 않았습니다", "NO_CITIES_PROVIDED")
+            throw BusinessException("비교할 도시가 지정되지 않았습니다", "NO_CITIES_PROVIDED")
         }
         
         if (cities.size > 10) {
-            throw WeatherServiceException("한 번에 비교할 수 있는 도시는 최대 10개입니다", "TOO_MANY_CITIES")
+            throw BusinessException("한 번에 비교할 수 있는 도시는 최대 10개입니다", "TOO_MANY_CITIES")
         }
         
         logger.info("날씨 비교 요청: cities=${cities.joinToString()}, units=${request.units}")
@@ -72,7 +73,7 @@ class WeatherService(
             weatherRepository.getWeatherForCities(cities, request.units)
         } catch (e: Exception) {
             logger.error("날씨 비교 조회 실패: cities=${cities.joinToString()}", e)
-            throw WeatherServiceException("날씨 비교 정보를 조회할 수 없습니다: ${e.message}", "COMPARE_FETCH_FAILED", e)
+            throw BusinessException("날씨 비교 정보를 조회할 수 없습니다: ${e.message}", "COMPARE_FETCH_FAILED", e)
         }
     }
     
@@ -122,23 +123,23 @@ class WeatherService(
     // 검증 메소드들
     private fun validateCity(city: String) {
         if (city.isBlank()) {
-            throw WeatherServiceException("도시명이 필요합니다", "CITY_REQUIRED")
+            throw BusinessException("도시명이 필요합니다", "CITY_REQUIRED")
         }
         if (city.length > 100) {
-            throw WeatherServiceException("도시명이 너무 깁니다", "CITY_NAME_TOO_LONG")
+            throw BusinessException("도시명이 너무 깁니다", "CITY_NAME_TOO_LONG")
         }
     }
     
     private fun validateUnits(units: String) {
         val validUnits = setOf("metric", "imperial", "kelvin")
         if (units !in validUnits) {
-            throw WeatherServiceException("지원하지 않는 단위입니다: $units", "INVALID_UNITS")
+            throw BusinessException("지원하지 않는 단위입니다: $units", "INVALID_UNITS")
         }
     }
     
     private fun validateCount(count: Int) {
         if (count < 1 || count > 40) {
-            throw WeatherServiceException("예보 개수는 1-40 사이여야 합니다", "INVALID_COUNT")
+            throw BusinessException("예보 개수는 1-40 사이여야 합니다", "INVALID_COUNT")
         }
     }
     
@@ -149,12 +150,3 @@ class WeatherService(
             .distinct()
     }
 }
-
-/**
- * Weather Service 전용 예외
- */
-class WeatherServiceException(
-    message: String,
-    val errorCode: String,
-    cause: Throwable? = null
-) : RuntimeException(message, cause)
