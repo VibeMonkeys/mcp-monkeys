@@ -1,8 +1,7 @@
 package com.monkeys.translate.repository.impl
 
 import com.monkeys.translate.repository.TranslateRepository
-import com.monkeys.shared.dto.TranslateRequest
-import com.monkeys.shared.dto.TranslateResult
+import com.monkeys.shared.dto.*
 import org.springframework.context.annotation.Profile
 import org.springframework.stereotype.Repository
 import org.slf4j.LoggerFactory
@@ -146,7 +145,7 @@ class MockTranslateRepository : TranslateRepository {
         "Have a good day" to "좋은 하루 보내세요"
     )
     
-    override suspend fun translateText(request: TranslateRequest): TranslateResult = withContext(Dispatchers.IO) {
+    override suspend fun translateText(request: TranslationRequest): TranslationResult = withContext(Dispatchers.IO) {
         logger.info("Mock 번역 요청: ${request.sourceLanguage} -> ${request.targetLanguage}, text='${request.text}'")
         
         val sourceText = request.text.trim()
@@ -177,16 +176,16 @@ class MockTranslateRepository : TranslateRepository {
             }
         }
         
-        val result = TranslateResult(
+        val result = TranslationResult(
             originalText = request.text,
             translatedText = translatedText,
             sourceLanguage = request.sourceLanguage,
             targetLanguage = request.targetLanguage,
-            confidence = if (translatedText.startsWith("지원하지 않는")) 0.0 else 0.95,
+            confidenceScore = if (translatedText.startsWith("지원하지 않는")) 0.0 else 0.95,
             detectedLanguage = request.sourceLanguage
         )
         
-        logger.info("Mock 번역 결과: '${request.text}' -> '$translatedText' (confidence: ${result.confidence})")
+        logger.info("Mock 번역 결과: '${request.text}' -> '$translatedText' (confidence: ${result.confidenceScore})")
         result
     }
     
@@ -248,29 +247,49 @@ class MockTranslateRepository : TranslateRepository {
         return "번역을 사용할 수 없습니다: $text"
     }
     
-    override suspend fun detectLanguage(text: String): String = withContext(Dispatchers.IO) {
-        logger.info("Mock 언어 감지: text='$text'")
+    override suspend fun detectLanguage(request: LanguageDetectionRequest): LanguageDetectionResult = withContext(Dispatchers.IO) {
+        logger.info("Mock 언어 감지: text='${request.text}'")
         
         val detectedLang = when {
             // 한국어 문자 포함 확인 (한글 유니코드 범위: AC00-D7A3)
-            text.any { it.code in 0xAC00..0xD7A3 } -> "ko"
+            request.text.any { it.code in 0xAC00..0xD7A3 } -> "ko"
             
             // 영어 알파벳만 포함
-            text.all { it.isLetter() && it.code < 128 || it.isWhitespace() || it.isDigit() } -> "en"
+            request.text.all { it.isLetter() && it.code < 128 || it.isWhitespace() || it.isDigit() } -> "en"
             
             // 기본값
             else -> "unknown"
         }
         
-        logger.info("Mock 언어 감지 결과: '$text' -> $detectedLang")
-        detectedLang
+        val result = LanguageDetectionResult(
+            languageCode = detectedLang,
+            languageName = when (detectedLang) {
+                "ko" -> "Korean"
+                "en" -> "English"
+                else -> "Unknown"
+            },
+            confidence = if (detectedLang == "unknown") 0.1 else 0.9
+        )
+        
+        logger.info("Mock 언어 감지 결과: '${request.text}' -> $detectedLang")
+        result
     }
     
-    override suspend fun getSupportedLanguages(): Map<String, String> = withContext(Dispatchers.IO) {
+    override suspend fun getSupportedLanguages(): List<SupportedLanguage> = withContext(Dispatchers.IO) {
         logger.info("Mock 지원 언어 목록 조회")
-        mapOf(
-            "ko" to "Korean",
-            "en" to "English"
+        listOf(
+            SupportedLanguage(
+                code = "ko",
+                name = "Korean",
+                nameKo = "한국어",
+                nativeName = "한국어"
+            ),
+            SupportedLanguage(
+                code = "en",
+                name = "English",
+                nameKo = "영어",
+                nativeName = "English"
+            )
         )
     }
     

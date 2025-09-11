@@ -5,6 +5,7 @@ import com.monkeys.shared.dto.*
 import com.monkeys.shared.util.ApiClient
 import com.monkeys.shared.util.ApiException
 import org.springframework.beans.factory.annotation.Value
+import org.springframework.context.annotation.Profile
 import org.springframework.stereotype.Repository
 import okhttp3.OkHttpClient
 import org.slf4j.LoggerFactory
@@ -18,6 +19,7 @@ import java.net.URLEncoder
  * 공통 ApiClient 사용으로 HTTP 처리 표준화
  */
 @Repository
+@Profile("external-api")
 class GoogleTranslateRepository(
     @Value("\${google.translate.api.key:dummy-key}") private val apiKey: String,
     translateHttpClient: OkHttpClient,

@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory
 import kotlinx.coroutines.*
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import kotlin.random.Random
 
 /**
  * Mock 날씨 데이터 제공 Repository
@@ -34,12 +35,8 @@ class MockWeatherRepository : WeatherRepository {
             pressure = 1013,
             windSpeed = 2.1,
             windDirection = 180,
-            visibility = 10.0,
-            cloudiness = 10,
-            uvIndex = 5,
-            timezone = 32400,
-            sunrise = "06:30",
-            sunset = "18:45"
+            visibility = 10000,
+            units = "metric"
         ),
         "부산" to WeatherInfo(
             city = "부산",
@@ -52,12 +49,8 @@ class MockWeatherRepository : WeatherRepository {
             pressure = 1015,
             windSpeed = 3.2,
             windDirection = 225,
-            visibility = 8.5,
-            cloudiness = 60,
-            uvIndex = 4,
-            timezone = 32400,
-            sunrise = "06:32",
-            sunset = "18:48"
+            visibility = 8500,
+            units = "metric"
         ),
         "대구" to WeatherInfo(
             city = "대구",
@@ -70,12 +63,8 @@ class MockWeatherRepository : WeatherRepository {
             pressure = 1008,
             windSpeed = 1.8,
             windDirection = 90,
-            visibility = 6.0,
-            cloudiness = 85,
-            uvIndex = 2,
-            timezone = 32400,
-            sunrise = "06:31",
-            sunset = "18:46"
+            visibility = 6000,
+            units = "metric"
         ),
         "인천" to WeatherInfo(
             city = "인천",
@@ -88,12 +77,8 @@ class MockWeatherRepository : WeatherRepository {
             pressure = 1014,
             windSpeed = 2.8,
             windDirection = 200,
-            visibility = 10.0,
-            cloudiness = 5,
-            uvIndex = 6,
-            timezone = 32400,
-            sunrise = "06:29",
-            sunset = "18:44"
+            visibility = 10000,
+            units = "metric"
         ),
         "광주" to WeatherInfo(
             city = "광주",
@@ -106,12 +91,8 @@ class MockWeatherRepository : WeatherRepository {
             pressure = 1011,
             windSpeed = 1.2,
             windDirection = 45,
-            visibility = 3.0,
-            cloudiness = 40,
-            uvIndex = 1,
-            timezone = 32400,
-            sunrise = "06:33",
-            sunset = "18:47"
+            visibility = 3000,
+            units = "metric"
         ),
         "대전" to WeatherInfo(
             city = "대전",
@@ -124,12 +105,8 @@ class MockWeatherRepository : WeatherRepository {
             pressure = 1016,
             windSpeed = 2.5,
             windDirection = 170,
-            visibility = 10.0,
-            cloudiness = 15,
-            uvIndex = 5,
-            timezone = 32400,
-            sunrise = "06:31",
-            sunset = "18:45"
+            visibility = 10000,
+            units = "metric"
         ),
         "울산" to WeatherInfo(
             city = "울산",
@@ -142,12 +119,8 @@ class MockWeatherRepository : WeatherRepository {
             pressure = 1012,
             windSpeed = 3.5,
             windDirection = 240,
-            visibility = 9.0,
-            cloudiness = 75,
-            uvIndex = 3,
-            timezone = 32400,
-            sunrise = "06:32",
-            sunset = "18:48"
+            visibility = 9000,
+            units = "metric"
         ),
         "제주" to WeatherInfo(
             city = "제주",
@@ -160,12 +133,8 @@ class MockWeatherRepository : WeatherRepository {
             pressure = 1018,
             windSpeed = 4.2,
             windDirection = 280,
-            visibility = 10.0,
-            cloudiness = 8,
-            uvIndex = 7,
-            timezone = 32400,
-            sunrise = "06:35",
-            sunset = "18:50"
+            visibility = 10000,
+            units = "metric"
         )
     )
     
@@ -184,13 +153,15 @@ class MockWeatherRepository : WeatherRepository {
             "imperial" -> baseWeather.copy(
                 temperature = baseWeather.temperature * 9/5 + 32,
                 feelsLike = baseWeather.feelsLike * 9/5 + 32,
-                windSpeed = baseWeather.windSpeed * 2.237 // m/s to mph
+                windSpeed = baseWeather.windSpeed * 2.237, // m/s to mph
+                units = units
             )
             "kelvin" -> baseWeather.copy(
                 temperature = baseWeather.temperature + 273.15,
-                feelsLike = baseWeather.feelsLike + 273.15
+                feelsLike = baseWeather.feelsLike + 273.15,
+                units = units
             )
-            else -> baseWeather // metric (기본값)
+            else -> baseWeather.copy(units = units) // metric (기본값)
         }
         
         logger.info("Mock 날씨 응답: ${convertedWeather.city} ${convertedWeather.temperature}°")
@@ -217,10 +188,11 @@ class MockWeatherRepository : WeatherRepository {
                     pressure = baseWeather.pressure + (-5..5).random(),
                     main = baseWeather.main,
                     description = baseWeather.description,
-                    windSpeed = baseWeather.windSpeed + (-1.0..1.0).random(),
+                    windSpeed = baseWeather.windSpeed + Random.nextDouble(-1.0, 1.0),
                     windDirection = baseWeather.windDirection + (-30..30).random(),
-                    cloudiness = (baseWeather.cloudiness + (-20..20).random()).coerceIn(0, 100),
-                    pop = if (baseWeather.main.contains("Rain", ignoreCase = true)) 0.8 else 0.1
+                    precipitationProbability = if (baseWeather.main.contains("Rain", ignoreCase = true)) 80.0 else 10.0,
+                    city = baseWeather.city,
+                    units = baseWeather.units
                 )
             )
         }
@@ -248,12 +220,8 @@ class MockWeatherRepository : WeatherRepository {
                     pressure = 1013,
                     windSpeed = 0.0,
                     windDirection = 0,
-                    visibility = 10.0,
-                    cloudiness = 0,
-                    uvIndex = 0,
-                    timezone = 0,
-                    sunrise = "06:00",
-                    sunset = "18:00"
+                    visibility = 10000,
+                    units = units
                 )
             }
         }
