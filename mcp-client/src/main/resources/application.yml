@@ -5,18 +5,23 @@ spring:
   application:
     name: unified-mcp-client
   ai:
-    openai:
-      api-key: ${GEMINI_API_KEY:dummy-api-key}
-      base-url: https://generativelanguage.googleapis.com/v1beta/openai
-      chat:
-        completions-path: /chat/completions
-        options:
-          model: gemini-2.0-flash-exp
+    # Vertex AI는 Google Cloud 인증을 사용하므로 별도 API 키가 필요 없습니다.
+    vertex:
+      ai:
+        gemini:
+          project-id: {실제 프로젝트 id}
+          location: ${GOOGLE_CLOUD_LOCATION:asia-northeast1} # 도쿄가 한국에서는 빠름
+          chat:
+            options:
+              model: gemini-1.5-flash
+              temperature: 0.7
     mcp:
       client:
         enabled: true
         type: SYNC
         request-timeout: 30s
+        toolcallback:
+          enabled: true
         sse:
           transport-mode: WEBFLUX
           connections:

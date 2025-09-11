@@ -1,31 +1,20 @@
 package com.monkeys.weather.service
 
+import com.monkeys.shared.dto.*
 import org.springframework.ai.tool.annotation.Tool
 import org.springframework.ai.tool.annotation.ToolParam
-import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
-import okhttp3.*
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import com.fasterxml.jackson.module.kotlin.readValue
 import org.slf4j.LoggerFactory
-import io.micrometer.core.instrument.MeterRegistry
-import io.micrometer.core.instrument.Timer
 
+/**
+ * Weather MCP Tool Provider
+ * MCP 프로토콜용 Tool 어노테이션만 담당 - 얇은 어댑터 계층
+ */
 @Service
 class WeatherMcpService(
-    @Value("\${weather.api.key:dummy-key}") private val apiKey: String,
-    private val weatherHttpClient: OkHttpClient,
-    private val meterRegistry: MeterRegistry
+    private val weatherService: WeatherService
 ) {
-    private val mapper = jacksonObjectMapper()
     private val logger = LoggerFactory.getLogger(WeatherMcpService::class.java)
-    private val baseUrl = "https://api.openweathermap.org/data/2.5"
-    private val maxRetries = 3
-    
-    // 메트릭 타이머
-    private val weatherApiTimer = Timer.builder("weather.api.request")
-        .description("Weather API 요청 시간")
-        .register(meterRegistry)
 
     @Tool(description = "지정된 도시의 현재 날씨 정보를 조회합니다")
     fun getCurrentWeather(
@@ -34,10 +23,99 @@ class WeatherMcpService(
         @ToolParam(description = "단위 (metric: 섭씨, imperial: 화씨, kelvin: 켈빈)")
         units: String = "metric"
     ): WeatherInfo {
-        if (apiKey == "dummy-key") {
-            logger.warn("Weather API 호출 실패: API 키가 설정되지 않음")
-            return createDummyWeather(city, "API 키가 설정되지 않았습니다.", units)
+        logger.info("MCP Tool 호출: getCurrentWeather - city=$city, units=$units")
+        
+        return try {
+            val request = WeatherRequest(city = city, units = units)
+            weatherService.getCurrentWeather(request)
+        } catch (e: WeatherServiceException) {
+            logger.error("날씨 조회 실패: ${e.message}", e)
+            createErrorWeatherInfo(city, units, e.message)
+        } catch (e: Exception) {
+            logger.error("예상치 못한 오류", e)
+            createErrorWeatherInfo(city, units, "일시적 오류가 발생했습니다")
         }
+    }
+
+    @Tool(description = "지정된 도시의 5일 날씨 예보를 조회합니다")
+    fun getWeatherForecast(
+        @ToolParam(description = "도시 이름 (예: Seoul, Tokyo, New York)", required = true)
+        city: String,
+        @ToolParam(description = "단위 (metric: 섭씨, imperial: 화씨, kelvin: 켈빈)")
+        units: String = "metric",
+        @ToolParam(description = "예보 개수 (최대 40개, 3시간 단위)")
+        count: Int = 8
+    ): List<WeatherForecast> {
+        logger.info("MCP Tool 호출: getWeatherForecast - city=$city, units=$units, count=$count")
+        
+        return try {
+            val request = WeatherForecastRequest(city = city, units = units, count = count)
+            weatherService.getWeatherForecast(request)
+        } catch (e: WeatherServiceException) {
+            logger.error("날씨 예보 조회 실패: ${e.message}", e)
+            listOf(createErrorWeatherForecast(city, units, e.message))
+        } catch (e: Exception) {
+            logger.error("예상치 못한 예보 오류", e)
+            listOf(createErrorWeatherForecast(city, units, "일시적 오류가 발생했습니다"))
+        }
+    }
+
+    @Tool(description = "여러 도시의 날씨를 비교합니다")
+    fun compareWeather(
+        @ToolParam(description = "비교할 도시들 (쉼표로 구분)", required = true)
+        cities: String,
+        @ToolParam(description = "단위 (metric: 섭씨, imperial: 화씨, kelvin: 켈빈)")
+        units: String = "metric"
+    ): List<WeatherInfo> {
+        logger.info("MCP Tool 호출: compareWeather - cities=$cities, units=$units")
+        
+        return try {
+            val request = WeatherCompareRequest(cities = cities, units = units)
+            weatherService.compareWeather(request)
+        } catch (e: WeatherServiceException) {
+            logger.error("날씨 비교 실패: ${e.message}", e)
+            listOf(createErrorWeatherInfo("비교 실패", units, e.message))
+        } catch (e: Exception) {
+            logger.error("예상치 못한 비교 오류", e)
+            listOf(createErrorWeatherInfo("비교 실패", units, "일시적 오류가 발생했습니다"))
+        }
+    }
+    
+    // 에러 응답 생성 헬퍼 메소드들
+    private fun createErrorWeatherInfo(city: String, units: String, error: String): WeatherInfo {
+        return WeatherInfo(
+            city = city,
+            country = "XX",
+            temperature = 0.0,
+            feelsLike = 0.0,
+            humidity = 0,
+            pressure = 0,
+            description = "오류: $error",
+            main = "Error",
+            windSpeed = 0.0,
+            windDirection = 0,
+            visibility = 0,
+            units = units
+        )
+    }
+    
+    private fun createErrorWeatherForecast(city: String, units: String, error: String): WeatherForecast {
+        return WeatherForecast(
+            dateTime = "2024-01-01 12:00:00",
+            temperature = 0.0,
+            feelsLike = 0.0,
+            humidity = 0,
+            pressure = 0,
+            description = "오류: $error",
+            main = "Error",
+            windSpeed = 0.0,
+            windDirection = 0,
+            precipitationProbability = 0.0,
+            city = city,
+            units = units
+        )
+    }
+}
         
         logger.info("날씨 조회 요청: city={}, units={}, apiKey={}", city, units, maskApiKey(apiKey))
         

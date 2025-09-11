@@ -1,113 +1,99 @@
 package com.monkeys.client.controller
 
-import com.monkeys.client.dto.*
+import com.monkeys.client.service.ChatService
 import com.monkeys.client.service.SimpleUnifiedMcpService
-import org.springframework.ai.chat.client.ChatClient
-import org.springframework.ai.converter.BeanOutputConverter
+import com.monkeys.client.service.ChatServiceException
+import com.monkeys.shared.dto.*
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 import org.slf4j.LoggerFactory
 import reactor.core.publisher.Flux
 import org.springframework.http.MediaType
 
+/**
+ * 통합 채팅 컨트롤러
+ * 얇은 컨트롤러 원칙 - HTTP 요청/응답 처리만 담당
+ */
 @RestController
 @RequestMapping("/api")
-@CrossOrigin(origins = ["http://localhost:3004", "http://localhost:3000"]) // React 개발 서버용
+@CrossOrigin(origins = ["http://localhost:3004", "http://localhost:3000"])
 class UnifiedChatController(
-    private val chatClient: ChatClient,
+    private val chatService: ChatService,
     private val unifiedMcpService: SimpleUnifiedMcpService
 ) {
     private val logger = LoggerFactory.getLogger(UnifiedChatController::class.java)
 
-    data class ChatRequest(
-        val message: String, 
-        val sessionId: String? = null,
-        val format: String? = null // "structured" 또는 "text"
-    )
-    data class ChatResponse(val response: String, val timestamp: Long = System.currentTimeMillis())
-    data class StructuredChatResponse(val data: Any, val format: String, val timestamp: Long = System.currentTimeMillis())
-
     @PostMapping("/chat")
-    fun chat(@RequestBody request: ChatRequest): ResponseEntity<Any> {
-        logger.info("통합 채팅 요청: {}", request.message)
+    fun chat(@RequestBody request: ChatRequest): ResponseEntity<BaseResponse<Any>> {
+        logger.info("통합 채팅 요청: format=${request.format}")
         
         return try {
-            // 세션 ID 설정
-            val sessionId = request.sessionId ?: "default-session"
-            
-            val chatBuilder = chatClient.prompt()
-                .user(buildPrompt(request.message))
-                .tools(unifiedMcpService)
-            
-            // Structured Output 요청 처리
             if (request.format == "structured") {
-                val responseType = determineResponseType(request.message)
-                val converter = BeanOutputConverter(responseType)
-                
-                val structuredResponse = chatBuilder
-                    .user("${request.message}\n\n${converter.format}")
-                    .call()
-                    .entity(responseType)
-                
-                ResponseEntity.ok(StructuredChatResponse(structuredResponse ?: "No response", "structured"))
+                val response = chatService.generateStructuredResponse(request)
+                ResponseEntity.ok(BaseResponse.success(response, "구조화된 응답 생성 완료"))
             } else {
-                val response = chatBuilder
-                    .call()
-                    .content() ?: "응답을 생성할 수 없습니다."
-                
-                ResponseEntity.ok(ChatResponse(response))
+                val response = chatService.generateChatResponse(request)
+                ResponseEntity.ok(BaseResponse.success(response, "채팅 응답 생성 완료"))
             }
+        } catch (e: ChatServiceException) {
+            logger.error("채팅 처리 오류: ${e.message}", e)
+            ResponseEntity.status(400).body(
+                BaseResponse.failure<Any>("채팅 요청 처리 실패: ${e.message}", e.errorCode)
+            )
         } catch (e: Exception) {
-            logger.error("채팅 처리 중 오류: {}", e.message, e)
+            logger.error("예상치 못한 채팅 오류", e)
             ResponseEntity.status(500).body(
-                ChatResponse("요청 처리 중 오류가 발생했습니다: ${e.message}")
+                BaseResponse.failure<Any>("서버 내부 오류가 발생했습니다")
             )
         }
     }
     
     @GetMapping(value = ["/chat/stream"], produces = [MediaType.TEXT_EVENT_STREAM_VALUE])
-    fun chatStream(@RequestParam message: String, @RequestParam(required = false) sessionId: String?): Flux<String> {
-        logger.info("스트리밍 채팅 요청: {}", message)
+    fun chatStream(
+        @RequestParam message: String, 
+        @RequestParam(required = false) sessionId: String?
+    ): Flux<String> {
+        logger.info("스트리밍 채팅 요청")
         
-        val actualSessionId = sessionId ?: "default-session"
-        
-        return chatClient.prompt()
-            .user(buildPrompt(message))
-            .tools(unifiedMcpService)
-            .stream()
-            .content()
-            .map { chunk -> "data: $chunk\n\n" }
-            .onErrorReturn("data: [ERROR] 스트리밍 중 오류가 발생했습니다.\n\n")
+        return chatService.generateStreamingResponse(message, sessionId)
     }
 
     @GetMapping("/tools")
-    fun getAvailableTools(): Map<String, Map<String, String>> {
-        return mapOf(
-            "GitHub" to mapOf(
+    fun getAvailableTools(): ResponseEntity<BaseResponse<Map<String, Map<String, String>>>> {
+        val tools = mapOf(
+            "Weather" to mapOf(
+                "getCurrentWeather" to "현재 날씨 정보를 조회합니다",
+                "getWeatherForecast" to "날씨 예보를 조회합니다",
+                "compareWeather" to "여러 도시의 날씨를 비교합니다"
+            ),
+            "News" to mapOf(
+                "getTopHeadlines" to "최신 뉴스 헤드라인을 조회합니다",
+                "searchNews" to "키워드로 뉴스를 검색합니다",
+                "getNewsBySource" to "특정 출처의 뉴스를 조회합니다"
+            ),
+            "Translate" to mapOf(
+                "translateText" to "텍스트를 번역합니다",
+                "detectLanguage" to "언어를 감지합니다",
+                "getSupportedLanguages" to "지원되는 언어 목록을 조회합니다"
+            ),
+            "Calendar" to mapOf(
+                "createCalendarEvent" to "캘린더 이벤트를 생성합니다",
+                "getCalendarEvents" to "캘린더 이벤트 목록을 조회합니다",
+                "deleteCalendarEvent" to "캘린더 이벤트를 삭제합니다"
+            ),
+            "External" to mapOf(
                 "getGitHubIssues" to "GitHub 저장소의 이슈 목록을 조회합니다",
-                "createGitHubIssue" to "GitHub 저장소에 새로운 이슈를 생성합니다"
-            ),
-            "Jira" to mapOf(
                 "getJiraIssues" to "Jira 프로젝트의 이슈 목록을 조회합니다",
-                "createJiraIssue" to "Jira에 새로운 이슈를 생성합니다"
-            ),
-            "Gmail" to mapOf(
-                "getGmailMessages" to "Gmail 받은편지함의 메일 목록을 조회합니다",
-                "sendGmailMessage" to "Gmail로 메일을 발송합니다"
-            ),
-            "Slack" to mapOf(
-                "sendSlackMessage" to "Slack 채널에 메시지를 전송합니다",
-                "getSlackMessages" to "Slack 채널의 최근 메시지를 조회합니다"
-            ),
-            "System" to mapOf(
-                "checkAllMcpServersStatus" to "모든 MCP 서버의 상태를 확인합니다"
+                "sendSlackMessage" to "Slack 채널에 메시지를 전송합니다"
             )
         )
+        
+        return ResponseEntity.ok(BaseResponse.success(tools, "사용 가능한 도구 목록"))
     }
 
     @GetMapping("/status")
-    fun getStatus(): Map<String, Any> {
-        return mapOf(
+    fun getStatus(): ResponseEntity<BaseResponse<Map<String, Any>>> {
+        val status = mapOf(
             "status" to "UP",
             "service" to "Unified MCP Client",
             "version" to "1.0.0",
@@ -119,54 +105,25 @@ class UnifiedChatController(
             ),
             "timestamp" to System.currentTimeMillis()
         )
+        
+        return ResponseEntity.ok(BaseResponse.success(status, "서비스 상태 정상"))
     }
 
     @PostMapping("/api-status")
-    fun checkApiStatus(): ResponseEntity<Map<String, Any>> {
+    fun checkApiStatus(): ResponseEntity<BaseResponse<Map<String, Any>>> {
         return try {
             val statusResult = unifiedMcpService.checkAllApiStatus()
             ResponseEntity.ok(
-                mapOf(
-                    "success" to true,
-                    "apiStatus" to statusResult,
-                    "timestamp" to System.currentTimeMillis()
+                BaseResponse.success(
+                    mapOf("apiStatus" to statusResult),
+                    "API 상태 확인 완료"
                 )
             )
         } catch (e: Exception) {
+            logger.error("API 상태 확인 실패", e)
             ResponseEntity.status(500).body(
-                mapOf(
-                    "success" to false,
-                    "error" to "API 상태 확인 중 오류: ${e.message}",
-                    "timestamp" to System.currentTimeMillis()
-                )
+                BaseResponse.failure<Map<String, Any>>("API 상태 확인 중 오류: ${e.message}")
             )
         }
-    }
-
-    private fun determineResponseType(message: String): Class<*> {
-        return when {
-            message.contains("날씨", ignoreCase = true) || 
-            message.contains("weather", ignoreCase = true) -> WeatherResponse::class.java
-            
-            message.contains("뉴스", ignoreCase = true) || 
-            message.contains("news", ignoreCase = true) -> NewsResponse::class.java
-            
-            message.contains("번역", ignoreCase = true) || 
-            message.contains("translate", ignoreCase = true) -> TranslationResponse::class.java
-            
-            message.contains("일정", ignoreCase = true) || 
-            message.contains("calendar", ignoreCase = true) -> CalendarResponse::class.java
-            
-            else -> MultiServiceResponse::class.java
-        }
-    }
-    
-    private fun buildPrompt(userMessage: String): String {
-        return """
-사용자 요청: $userMessage
-
-요청을 분석하여 적절한 도구를 사용하고 도움이 되는 정보를 제공해주세요.
-여러 시스템을 연계해야 하는 경우 순서대로 처리해주세요.
-        """.trimIndent()
     }
 }
