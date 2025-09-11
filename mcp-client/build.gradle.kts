@@ -37,7 +37,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("com.h2database:h2")
     implementation("org.springframework.ai:spring-ai-starter-mcp-client-webflux")
-    implementation("org.springframework.ai:spring-ai-starter-model-openai")
+    implementation("org.springframework.ai:spring-ai-starter-model-vertex-ai-gemini")
     
     // Observability & Monitoring
     implementation("io.micrometer:micrometer-core")
@@ -45,8 +45,7 @@ dependencies {
     implementation("io.micrometer:micrometer-tracing-bridge-otel")
     implementation("io.opentelemetry:opentelemetry-exporter-zipkin")
     
-    // External APIs
-    implementation("com.google.auth:google-auth-library-oauth2-http:1.23.0")
+    // External APIs (Gmail 관련 - Vertex AI와 분리)
     implementation("com.google.api-client:google-api-client:2.2.0")
     implementation("com.google.apis:google-api-services-gmail:v1-rev20231218-2.0.0")
     implementation("com.sun.mail:javax.mail:1.6.2")
