@@ -35,6 +35,8 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-validation")
+    implementation("org.springframework.retry:spring-retry")
+    implementation("org.springframework:spring-aspects")
     implementation("com.h2database:h2")
     implementation("org.springframework.ai:spring-ai-starter-mcp-client-webflux")
     implementation("org.springframework.ai:spring-ai-starter-model-vertex-ai-gemini")

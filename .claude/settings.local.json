@@ -71,7 +71,8 @@
       "Bash(gcloud services list:*)",
       "Bash(gcloud projects:*)",
       "Bash(gcloud services enable:*)",
-      "Bash(GOOGLE_CLOUD_PROJECT=\"gen-lang-client-0532718093\" GOOGLE_CLOUD_LOCATION=\"asia-northeast1\" ./gradlew :mcp-client:bootRun --args='--server.port=8090')"
+      "Bash(GOOGLE_CLOUD_PROJECT=\"gen-lang-client-0532718093\" GOOGLE_CLOUD_LOCATION=\"asia-northeast1\" ./gradlew :mcp-client:bootRun --args='--server.port=8090')",
+      "WebFetch(domain:spring.io)"
     ],
     "deny": [],
     "ask": []

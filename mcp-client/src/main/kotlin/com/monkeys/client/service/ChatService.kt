@@ -22,47 +22,60 @@ class ChatService(
      * 일반 채팅 응답 생성
      */
     fun generateChatResponse(request: ChatRequest): ChatResponse {
-        logger.info("채팅 요청 처리: message=${maskMessage(request.message)}, sessionId=${request.sessionId}")
+        val sessionId = request.sessionId ?: "default-session"
+        logger.info("채팅 요청 처리: message=${maskMessage(request.message)}, sessionId=$sessionId")
         
         try {
             val prompt = buildPrompt(request.message)
             val response = chatClient.prompt()
                 .user(prompt)
+                .system("당신은 MCP Monkeys의 통합 AI 어시스턴트입니다. 사용 가능한 도구들을 적절히 활용하여 사용자를 도와주세요.")
                 .call()
                 .content() ?: "응답을 생성할 수 없습니다."
             
+            logger.debug("응답 생성 완료: responseLength=${response.length}, sessionId=$sessionId")
+            
             return ChatResponse(
                 response = response,
-                sessionId = request.sessionId ?: "default-session"
+                sessionId = sessionId
             )
         } catch (e: Exception) {
-            logger.error("채팅 응답 생성 실패", e)
+            logger.error("채팅 응답 생성 실패: sessionId=$sessionId", e)
             throw ChatServiceException("채팅 응답을 생성할 수 없습니다: ${e.message}", "CHAT_GENERATION_FAILED", e)
         }
     }
     
     /**
-     * 구조화된 채팅 응답 생성
+     * 구조화된 채팅 응답 생성 (BeanOutputConverter 사용)
      */
     fun generateStructuredResponse(request: ChatRequest): StructuredChatResponse {
-        logger.info("구조화된 채팅 요청 처리: message=${maskMessage(request.message)}")
+        val sessionId = request.sessionId ?: "default-session"
+        logger.info("구조화된 채팅 요청 처리: message=${maskMessage(request.message)}, sessionId=$sessionId")
         
         try {
             val responseType = determineResponseType(request.message)
             val converter = BeanOutputConverter(responseType)
             
+            logger.debug("응답 타입 결정: ${responseType.simpleName}, sessionId=$sessionId")
+            
             val structuredResponse = chatClient.prompt()
                 .user("${request.message}\n\n${converter.format}")
+                .system("정확한 JSON 스키마를 따라 응답해주세요.")
                 .call()
                 .entity(responseType)
             
+            // 기본 검증
+            val validatedResponse = structuredResponse ?: "응답 생성 실패"
+            
+            logger.debug("구조화된 응답 생성 완료: type=${responseType.simpleName}, sessionId=$sessionId")
+            
             return StructuredChatResponse(
-                data = structuredResponse ?: "No response",
+                data = validatedResponse,
                 format = "structured",
-                sessionId = request.sessionId ?: "default-session"
+                sessionId = sessionId
             )
         } catch (e: Exception) {
-            logger.error("구조화된 응답 생성 실패", e)
+            logger.error("구조화된 응답 생성 실패: sessionId=$sessionId", e)
             throw ChatServiceException("구조화된 응답을 생성할 수 없습니다: ${e.message}", "STRUCTURED_GENERATION_FAILED", e)
         }
     }
@@ -71,18 +84,20 @@ class ChatService(
      * 스트리밍 채팅 응답 생성
      */
     fun generateStreamingResponse(message: String, sessionId: String?): Flux<String> {
-        logger.info("스트리밍 채팅 요청: message=${maskMessage(message)}, sessionId=$sessionId")
+        val effectiveSessionId = sessionId ?: "default-session"
+        logger.info("스트리밍 채팅 요청: message=${maskMessage(message)}, sessionId=$effectiveSessionId")
         
         return try {
             val prompt = buildPrompt(message)
             chatClient.prompt()
                 .user(prompt)
+                .system("스트리밍 응답을 위한 AI 어시스턴트입니다. 청크 단위로 자연스럽게 응답을 생성해주세요.")
                 .stream()
                 .content()
                 .map { chunk -> "data: $chunk\n\n" }
                 .onErrorReturn("data: [ERROR] 스트리밍 중 오류가 발생했습니다.\n\n")
         } catch (e: Exception) {
-            logger.error("스트리밍 응답 생성 실패", e)
+            logger.error("스트리밍 응답 생성 실패: sessionId=$effectiveSessionId", e)
             Flux.just("data: [ERROR] 스트리밍을 시작할 수 없습니다.\n\n")
         }
     }
@@ -119,6 +134,8 @@ class ChatService(
 여러 시스템을 연계해야 하는 경우 순서대로 처리해주세요.
         """.trimIndent()
     }
+    
+    
     
     /**
      * 메시지 마스킹 (로깅용)
