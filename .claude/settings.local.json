@@ -59,7 +59,19 @@
       "Bash(./start-all-servers.sh:*)",
       "mcp__serena__create_text_file",
       "mcp__serena__execute_shell_command",
-      "Bash(GOOGLE_CLOUD_PROJECT=\"gen-lang-client-0311835119\" GOOGLE_CLOUD_LOCATION=\"asia-northeast1\" java -jar build/libs/mcp-client-0.0.1-SNAPSHOT.jar)"
+      "Bash(GOOGLE_CLOUD_PROJECT=\"gen-lang-client-0311835119\" GOOGLE_CLOUD_LOCATION=\"asia-northeast1\" java -jar build/libs/mcp-client-0.0.1-SNAPSHOT.jar)",
+      "Bash(timeout:*)",
+      "Bash(gcloud config get-value:*)",
+      "Bash(GOOGLE_CLOUD_PROJECT=\"gen-lang-client-0311835119\" GOOGLE_CLOUD_LOCATION=\"asia-northeast1\" ./gradlew :mcp-client:bootRun --args='--server.port=8090')",
+      "Bash(SPRING_PROFILES_ACTIVE=mock ./gradlew :mcp-weather-server:bootRun --args='--server.port=8092')",
+      "Bash(SPRING_PROFILES_ACTIVE=mock ./gradlew :mcp-news-server:bootRun --args='--server.port=8093')",
+      "Bash(SPRING_PROFILES_ACTIVE=mock ./gradlew :mcp-translate-server:bootRun --args='--server.port=8094')",
+      "Bash(SPRING_PROFILES_ACTIVE=mock ./gradlew :mcp-calendar-server:bootRun --args='--server.port=8095')",
+      "Read(//Users/jinan/.config/gcloud/**)",
+      "Bash(gcloud services list:*)",
+      "Bash(gcloud projects:*)",
+      "Bash(gcloud services enable:*)",
+      "Bash(GOOGLE_CLOUD_PROJECT=\"gen-lang-client-0532718093\" GOOGLE_CLOUD_LOCATION=\"asia-northeast1\" ./gradlew :mcp-client:bootRun --args='--server.port=8090')"
     ],
     "deny": [],
     "ask": []

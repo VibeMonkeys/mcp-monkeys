@@ -36,7 +36,7 @@ gcloud auth application-default login
 # - Vertex AI API 액세스
 
 # 3. 프로젝트 설정
-gcloud config set project gen-lang-client-0124812904
+gcloud config set project {내 프로젝트 ID 넣기}
 ```
 
 ### 인증 확인
