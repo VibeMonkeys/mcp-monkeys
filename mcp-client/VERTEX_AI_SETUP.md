@@ -272,15 +272,120 @@ curl -X POST http://localhost:8090/api/chat \
   }'
 ```
 
+## 🔧 **상세 인증 설정 과정 (실제 경험 기반)**
+
+우리가 실제로 겪었던 문제와 해결 과정입니다. **두 가지 인증이 모두 필요합니다!**
+
+### 1단계: Application Default Credentials 설정
+
+터미널에서 다음 명령어를 실행합니다:
+
+```bash
+gcloud auth application-default login --no-launch-browser
+```
+
+### 2단계: 브라우저에서 첫 번째 인증
+
+명령어 실행 후 출력되는 URL을 복사하여 브라우저에서 열어주세요.
+
+예시 URL:
+```
+https://accounts.google.com/o/oauth2/auth?response_type=code&client_id=764086051850-6qr4p6gpi6hn506pt8ejuq83di341hur.apps.googleusercontent.com&redirect_uri=https%3A%2F%2Fsdk.cloud.google.com%2Fapplicationdefaultauthcode.html&scope=openid+https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fuserinfo.email+https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fcloud-platform+https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fsqlservice.login&state=YOUR_STATE&prompt=consent&token_usage=remote&access_type=offline&code_challenge=YOUR_CHALLENGE&code_challenge_method=S256
+```
+
+### 3단계: 첫 번째 인증 코드 입력
+
+1. 브라우저에서 Google 계정으로 로그인
+2. 권한 승인 완료
+3. 받은 인증 코드를 터미널에 입력 (복사 후 붙여넣기)
+
+### 4단계: gcloud CLI 계정 인증
+
+터미널에서 추가로 다음 명령어를 실행합니다:
+
+```bash
+gcloud auth login --no-launch-browser
+```
+
+### 5단계: 브라우저에서 두 번째 인증
+
+새로운 URL이 출력되므로 브라우저에서 열어 인증합니다.
+
+### 6단계: 두 번째 인증 코드 입력
+
+받은 인증 코드를 터미널에 입력합니다.
+
+### 7단계: 인증 확인
+
+두 가지 인증이 완료되었는지 확인:
+
+```bash
+# Application Default Credentials 확인
+ls -la ~/.config/gcloud/application_default_credentials.json
+
+# gcloud 계정 확인
+gcloud auth list
+```
+
+### 8단계: Vertex AI API 활성화
+
+프로젝트에서 Vertex AI API를 활성화합니다:
+
+```bash
+# 접근 가능한 프로젝트 확인
+gcloud projects list
+
+# Vertex AI API 활성화 (YOUR_PROJECT_ID를 실제 프로젝트 ID로 교체)
+gcloud services enable aiplatform.googleapis.com --project=YOUR_PROJECT_ID
+
+# API 활성화 확인
+gcloud services list --enabled --filter="name:aiplatform" --project=YOUR_PROJECT_ID
+```
+
+### 9단계: MCP 클라이언트 재시작
+
+새로운 인증 정보를 적용하기 위해 MCP 클라이언트를 재시작합니다:
+
+```bash
+# 기존 서버 종료 후
+GOOGLE_CLOUD_PROJECT="YOUR_PROJECT_ID" GOOGLE_CLOUD_LOCATION="asia-northeast1" ./gradlew :mcp-client:bootRun --args='--server.port=8090'
+```
+
+**중요**: `YOUR_PROJECT_ID`를 8단계에서 확인한 실제 프로젝트 ID로 교체하세요.
+
+## ✅ **인증 성공 확인**
+
+채팅 API 테스트로 인증 성공을 확인할 수 있습니다:
+
+```bash
+curl -X POST http://localhost:8090/api/chat \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "안녕하세요! 서울 날씨를 알려주세요.",
+    "conversationId": "test"
+  }'
+```
+
+성공시 AI 응답이 JSON 형태로 반환됩니다.
+
 ## 🔧 **트러블슈팅**
 
-### 인증 오류
+### 인증 코드 오류 발생시
+- 브라우저에서 새로운 URL로 재인증
+- 인증 코드는 한 번만 사용 가능하므로 새로 발급받아야 함
+
+### 인증 파일이 생성되지 않을 때
 ```bash
-# 인증 재설정
+# gcloud 재초기화
 gcloud auth revoke --all
-gcloud auth login
-gcloud auth application-default login
+gcloud auth application-default login --no-launch-browser
 ```
+
+### 여전히 인증 오류가 발생할 때
+- MCP 클라이언트 서버 재시작 필수
+- 환경변수 설정 확인:
+  - `GOOGLE_CLOUD_PROJECT=gen-lang-client-0532718093`
+  - `GOOGLE_CLOUD_LOCATION=asia-northeast1`
 
 ### 프로젝트 ID 확인
 ```bash
@@ -288,7 +393,7 @@ gcloud auth application-default login
 gcloud config get-value project
 
 # 프로젝트 변경
-gcloud config set project gen-lang-client-0311835119
+gcloud config set project gen-lang-client-0532718093
 ```
 
 ### API 활성화 확인
@@ -342,3 +447,16 @@ gcloud services enable aiplatform.googleapis.com
 ⚠️ **권한을 부분적으로만 승인하면 "Failed to generate content" 오류 발생**
 
 **💡 Tips**: 권한 승인을 제대로 하지 않았다면 `gcloud auth application-default login`을 다시 실행하여 모든 권한을 승인하세요.
+
+## 📝 **참고사항**
+
+- 인증은 일정 기간 후 만료될 수 있음
+- 만료시 위 과정을 다시 수행하면 됨
+- 인증 정보는 `~/.config/gcloud/` 디렉토리에 저장됨
+- **중요**: Application Default Credentials와 gcloud CLI 인증 **둘 다** 필요
+- 프로젝트 ID는 환경에 따라 다를 수 있으므로 `gcloud projects list`로 확인 필수
+
+## 🌐 **관련 링크**
+
+- [Google Cloud Application Default Credentials 가이드](https://cloud.google.com/docs/authentication/external/set-up-adc)
+- [Google Vertex AI 문서](https://cloud.google.com/vertex-ai/docs)
