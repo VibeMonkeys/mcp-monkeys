@@ -9,7 +9,7 @@ spring:
     vertex:
       ai:
         gemini:
-          project-id: ${GOOGLE_CLOUD_PROJECT:gen-lang-client-0311835119}
+          project-id: ${GOOGLE_CLOUD_PROJECT:gen-lang-client-0532718093}
           location: ${GOOGLE_CLOUD_LOCATION:asia-northeast1} # 도쿄가 한국에서는 빠름
           chat:
             options:
