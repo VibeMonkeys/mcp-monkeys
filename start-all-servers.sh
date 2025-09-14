@@ -16,8 +16,17 @@ start_server() {
     local port=$2
     local name=$3
     
-    echo "📡 $name 시작 중... (Port: $port)"
-    ./gradlew :$module:bootRun > logs/$module.log 2>&1 &
+    echo "📡 $name 시작 중... (Port: $port) [MOCK MODE]"
+    
+    if [[ "$module" == "mcp-client" ]]; then
+        # MCP Client는 특별한 환경변수 필요
+        GOOGLE_CLOUD_PROJECT="gen-lang-client-0532718093" GOOGLE_CLOUD_LOCATION="asia-northeast1" \
+        ./gradlew :$module:bootRun --args='--server.port='$port > logs/$module.log 2>&1 &
+    else
+        # MCP 서버들은 MOCK 프로필로 실행
+        SPRING_PROFILES_ACTIVE=mock ./gradlew :$module:bootRun --args='--server.port='$port > logs/$module.log 2>&1 &
+    fi
+    
     local pid=$!
     PIDS+=($pid)
     SERVERS+=("$name:$port")
