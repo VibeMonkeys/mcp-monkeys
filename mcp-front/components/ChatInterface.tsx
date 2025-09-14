@@ -27,7 +27,7 @@ export function ChatInterface() {
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'checking'>('checking');
   const [serverHealth, setServerHealth] = useState<McpHealthResponse | null>(null);
   const [comprehensiveHealth, setComprehensiveHealth] = useState<McpComprehensiveHealth | null>(null);
-  const [conversationId, setConversationId] = useState<string>('');
+  const [sessionId, setSessionId] = useState<string>('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -106,12 +106,12 @@ export function ChatInterface() {
     try {
       const chatResponse = await mcpApi.sendChatMessage({
         message: content.trim(),
-        conversationId: conversationId || undefined
+        sessionId: sessionId || undefined
       });
 
-      // conversation ID 업데이트
-      if (chatResponse.conversationId && !conversationId) {
-        setConversationId(chatResponse.conversationId);
+      // session ID 업데이트
+      if (chatResponse.sessionId && !sessionId) {
+        setSessionId(chatResponse.sessionId);
       }
 
       const assistantMessage: Message = {
@@ -159,7 +159,7 @@ export function ChatInterface() {
       timestamp: new Date(),
       type: 'text'
     }]);
-    setConversationId('');
+    setSessionId('');
     toast.success('대화가 초기화되었습니다');
   };
 
@@ -277,9 +277,9 @@ export function ChatInterface() {
             </div>
             <div className="flex items-center gap-2">
               {getConnectionBadge()}
-              {conversationId && (
+              {sessionId && (
                 <Badge variant="outline" className="text-xs">
-                  대화 ID: {conversationId.slice(-8)}
+                  세션 ID: {sessionId.slice(-8)}
                 </Badge>
               )}
             </div>

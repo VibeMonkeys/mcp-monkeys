@@ -40,13 +40,13 @@ export interface ChatMessage {
 
 export interface ChatRequest {
   message: string;
-  conversationId?: string;
+  sessionId?: string;
   tools?: string[];
 }
 
 export interface ChatResponse {
   response: string;
-  conversationId: string;
+  sessionId?: string;
   tools_used?: string[];
   timestamp: number;
 }
@@ -135,14 +135,30 @@ class McpApiService {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(request)
+        body: JSON.stringify({
+          message: request.message,
+          sessionId: request.sessionId
+        })
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        const errorText = await response.text();
+        throw new Error(`HTTP ${response.status}: ${response.statusText} - ${errorText}`);
       }
 
-      return await response.json();
+      const result = await response.json();
+      
+      // 백엔드 응답 형식에 맞게 변환
+      if (result.success && result.data) {
+        return {
+          response: result.data.response,
+          sessionId: result.data.sessionId,
+          tools_used: result.data.tools_used,
+          timestamp: result.timestamp || Date.now()
+        };
+      } else {
+        throw new Error(result.message || '알 수 없는 오류가 발생했습니다.');
+      }
     } catch (error) {
       console.error('채팅 메시지 전송 오류:', error);
       throw error;
