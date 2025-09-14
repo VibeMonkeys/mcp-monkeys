@@ -1,6 +1,7 @@
 package com.monkeys.client.service
 
 import com.monkeys.shared.dto.*
+import com.monkeys.client.exception.*
 import org.springframework.ai.tool.annotation.Tool
 import org.springframework.ai.tool.annotation.ToolParam
 import org.springframework.beans.factory.annotation.Value
@@ -29,17 +30,43 @@ class SimpleUnifiedMcpService(
         limit: Int = 10
     ): List<GitHubIssue> {
         logger.info("GitHub 이슈 조회 요청: $repository")
-        return listOf(
-            GitHubIssue(
-                number = 1,
-                title = "테스트 이슈 (API 설정 필요)",
-                body = "GitHub API 토큰을 설정하면 실제 데이터를 가져올 수 있습니다.",
-                state = state,
-                author = "system",
-                createdAt = "2024-01-01T00:00:00Z",
-                labels = listOf("test", "configuration-needed")
+        
+        try {
+            // 입력 검증
+            if (!repository.contains("/") || repository.split("/").size != 2) {
+                throw GitHubApiException(
+                    "저장소 형식이 올바르지 않습니다. 'owner/repo' 형식으로 입력해주세요.",
+                    "INVALID_PARAMETERS"
+                )
+            }
+            
+            // API 설정 확인
+            if (githubToken == "dummy-token") {
+                throw GitHubApiException(
+                    "GitHub API 토큰이 설정되지 않았습니다.",
+                    "API_NOT_CONFIGURED"
+                )
+            }
+            
+            // Mock 데이터 반환 (실제 API 호출로 대체 가능)
+            return listOf(
+                GitHubIssue(
+                    number = 1,
+                    title = "테스트 이슈 (API 설정 필요)",
+                    body = "GitHub API 토큰을 설정하면 실제 데이터를 가져올 수 있습니다.",
+                    state = state,
+                    author = "system",
+                    createdAt = "2024-01-01T00:00:00Z",
+                    labels = listOf("test", "configuration-needed")
+                )
             )
-        )
+        } catch (e: GitHubApiException) {
+            logger.error("GitHub 이슈 조회 실패: ${e.message}", e)
+            throw e
+        } catch (e: Exception) {
+            logger.error("GitHub 이슈 조회 중 예상치 못한 오류: ${e.message}", e)
+            throw GitHubApiException("GitHub 이슈 조회 중 오류가 발생했습니다", "UNKNOWN_ERROR", e)
+        }
     }
 
     @Tool(description = "GitHub 저장소에 새로운 이슈를 생성합니다")
@@ -52,15 +79,47 @@ class SimpleUnifiedMcpService(
         body: String = ""
     ): GitHubIssue {
         logger.info("GitHub 이슈 생성 요청: $title")
-        return GitHubIssue(
-            number = 99,
-            title = title,
-            body = body,
-            state = "open",
-            author = "api-user",
-            createdAt = "2024-01-01T00:00:00Z",
-            labels = listOf("created-by-api")
-        )
+        
+        try {
+            // 입력 검증
+            if (!repository.contains("/") || repository.split("/").size != 2) {
+                throw GitHubApiException(
+                    "저장소 형식이 올바르지 않습니다. 'owner/repo' 형식으로 입력해주세요.",
+                    "INVALID_PARAMETERS"
+                )
+            }
+            
+            if (title.isBlank()) {
+                throw GitHubApiException(
+                    "이슈 제목은 필수입니다.",
+                    "INVALID_PARAMETERS"
+                )
+            }
+            
+            // API 설정 확인
+            if (githubToken == "dummy-token") {
+                throw GitHubApiException(
+                    "GitHub API 토큰이 설정되지 않았습니다.",
+                    "API_NOT_CONFIGURED"
+                )
+            }
+            
+            return GitHubIssue(
+                number = 99,
+                title = title,
+                body = body,
+                state = "open",
+                author = "api-user",
+                createdAt = "2024-01-01T00:00:00Z",
+                labels = listOf("created-by-api")
+            )
+        } catch (e: GitHubApiException) {
+            logger.error("GitHub 이슈 생성 실패: ${e.message}", e)
+            throw e
+        } catch (e: Exception) {
+            logger.error("GitHub 이슈 생성 중 예상치 못한 오류: ${e.message}", e)
+            throw GitHubApiException("GitHub 이슈 생성 중 오류가 발생했습니다", "UNKNOWN_ERROR", e)
+        }
     }
 
     // Jira Tools (Simplified)
