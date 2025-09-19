@@ -67,7 +67,10 @@ mcp-front/build/
 mcp-front/.next/
 mcp-front/out/
 
-# Environment files
+# Environment files (Backend & Frontend)
+.env
+.env.local
+.env.*.local
 mcp-front/.env
 mcp-front/.env.local
 mcp-front/.env.development.local
