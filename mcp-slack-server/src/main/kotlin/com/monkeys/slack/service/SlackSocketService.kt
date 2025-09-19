@@ -205,7 +205,9 @@ class SlackSocketService(
             
             // 질문인지 확인
             if (isQuestion(text)) {
-                processQuestion(text, channel, user, ts)
+                // 질문 감지 즉시 눈 이모지로 인식 표시
+                addReaction(channel, ts, "eyes")
+                processQuestion(text, channel, ts)
             }
             
         } catch (e: Exception) {
@@ -229,7 +231,9 @@ class SlackSocketService(
             val cleanText = text.replace(Regex("<@[A-Z0-9]+>"), "").trim()
             
             if (cleanText.isNotEmpty()) {
-                processQuestion(cleanText, channel, user, ts)
+                // 앱 멘션 감지 즉시 눈 이모지로 인식 표시
+                addReaction(channel, ts, "eyes")
+                processQuestion(cleanText, channel, ts)
             }
             
         } catch (e: Exception) {
@@ -240,7 +244,7 @@ class SlackSocketService(
     /**
      * 질문 처리 및 답변
      */
-    private suspend fun processQuestion(question: String, channel: String, user: String, ts: String) {
+    private suspend fun processQuestion(question: String, channel: String, ts: String) {
         try {
             // 중복 처리 방지
             val messageKey = "$channel:$ts"
@@ -252,8 +256,9 @@ class SlackSocketService(
             
             logger.info("🔍 Q&A 검색 시작: '$question'")
             
-            // 진행 상황 리액션 추가
-            addReaction(channel, ts, "thinking_face")
+            
+            // 검색 중 이모지 추가
+            addReaction(channel, ts, "mag")
             
             // 실제 채널명 획득 (채널 ID에서 이름으로 변환)
             val channelName = getChannelNameFromId(channel) ?: "unknown"
@@ -270,30 +275,39 @@ class SlackSocketService(
             if (result.found) {
                 logger.info("✅ 유사한 질문 발견! 유사도: ${result.similarity}")
                 
-                // 성공 리액션
-                removeReaction(channel, ts, "thinking_face")
-                addReaction(channel, ts, "white_check_mark")
+                // 답변 찾는 중
+                addReaction(channel, ts, "brain")
                 
                 // 자연스러운 답변 생성
                 val naturalAnswer = generateNaturalAnswer(result, channelName)
+                
+                // 최종 성공 - 진행 상황 이모지들 제거하고 완료 표시
+                removeReaction(channel, ts, "mag") 
+                removeReaction(channel, ts, "brain")
+                addReaction(channel, ts, "white_check_mark")
+                
                 sendMessage(channel, naturalAnswer, ts)
                 
             } else {
                 logger.info("❓ 유사한 질문 없음")
                 
-                // 질문 리액션
-                removeReaction(channel, ts, "thinking_face")
+                // 검색 완료했지만 결과 없음 - 검색 이모지만 제거
+                removeReaction(channel, ts, "mag")
                 addReaction(channel, ts, "question")
                 
                 // 새로운 질문 안내
-                sendMessage(channel, "새로운 질문이네요! 누군가 답변해 주시면 다음에 도움이 될 것 같아요 🤔", ts)
+                sendMessage(channel, "새로운 질문이네요! 누군가 답변해 주시면 다음에 도움이 될 것 같아요 💡", ts)
             }
             
         } catch (e: Exception) {
             logger.error("질문 처리 오류", e)
             
-            removeReaction(channel, ts, "thinking_face")
+            // 에러 시 진행 상황 리액션 제거하고 에러 표시 (eyes는 유지)
+            removeReaction(channel, ts, "mag")
+            removeReaction(channel, ts, "brain")
             addReaction(channel, ts, "x")
+            
+            sendMessage(channel, "죄송해요, 검색 중 오류가 발생했어요 😓 잠시 후 다시 시도해주세요!", ts)
         }
     }
 
@@ -497,16 +511,23 @@ class SlackSocketService(
     /**
      * 메시지 전송
      */
-    private suspend fun sendMessage(channel: String, text: String, threadTs: String? = null) {
-        try {
-            slack.methods(botToken).chatPostMessage { req ->
+    private suspend fun sendMessage(channel: String, text: String, threadTs: String? = null): String? {
+        return try {
+            val response = slack.methods(botToken).chatPostMessage { req ->
                 req.channel(channel)
                     .text(text)
                     .threadTs(threadTs)
             }
-            logger.info("💬 메시지 전송 완료")
+            if (response.isOk) {
+                logger.info("💬 메시지 전송 완료")
+                response.ts
+            } else {
+                logger.error("메시지 전송 실패: ${response.error}")
+                null
+            }
         } catch (e: Exception) {
             logger.error("메시지 전송 실패", e)
+            null
         }
     }
 
@@ -515,11 +536,14 @@ class SlackSocketService(
      */
     private suspend fun addReaction(channel: String, timestamp: String, reaction: String) {
         try {
-            slack.methods(botToken).reactionsAdd { req ->
+            val response = slack.methods(botToken).reactionsAdd { req ->
                 req.channel(channel).timestamp(timestamp).name(reaction)
             }
+            if (!response.isOk) {
+                logger.warn("리액션 추가 실패: $reaction, 오류: ${response.error}")
+            }
         } catch (e: Exception) {
-            logger.debug("리액션 추가 실패: $reaction", e)
+            logger.warn("리액션 추가 실패: $reaction", e)
         }
     }
 
@@ -528,8 +552,11 @@ class SlackSocketService(
      */
     private suspend fun removeReaction(channel: String, timestamp: String, reaction: String) {
         try {
-            slack.methods(botToken).reactionsRemove { req ->
+            val response = slack.methods(botToken).reactionsRemove { req ->
                 req.channel(channel).timestamp(timestamp).name(reaction)
+            }
+            if (!response.isOk) {
+                logger.debug("리액션 제거 실패: $reaction, 오류: ${response.error}")
             }
         } catch (e: Exception) {
             logger.debug("리액션 제거 실패: $reaction", e)

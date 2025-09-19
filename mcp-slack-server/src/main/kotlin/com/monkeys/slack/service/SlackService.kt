@@ -30,6 +30,7 @@ class SlackService(
         val bestMatch = matches.maxByOrNull { it.similarity }
         
         return if (bestMatch != null) {
+            logger.debug("최적 매치 발견: question='${bestMatch.qaEntry.question}', answer='${bestMatch.qaEntry.answer}'")
             SlackQAResult(
                 found = true,
                 originalQuestion = request.question,

@@ -134,7 +134,8 @@ class SlackRepositoryImpl(
                     
                     // 메인 메시지
                     if (messageText.length > 5) { // 너무 짧은 메시지 제외
-                        val bestAnswer = findBestAnswer(threadMessages, messageText)
+                        val bestAnswer = findBestAnswer(threadMessages)
+                        logger.debug("메인 메시지 처리: question='$messageText', answer='$bestAnswer'")
                         allMessages.add(
                             SlackQAEntry(
                                 id = ts,
@@ -149,24 +150,8 @@ class SlackRepositoryImpl(
                         fetched++
                     }
                     
-                    // 스레드 메시지들도 추가
-                    for (threadMsg in threadMessages) {
-                        if (fetched >= limit) break
-                        if (threadMsg.text?.length ?: 0 > 10) {
-                            allMessages.add(
-                                SlackQAEntry(
-                                    id = threadMsg.ts ?: "",
-                                    question = threadMsg.text ?: "",
-                                    answer = "",
-                                    channel = channelName,
-                                    author = threadMsg.user ?: "",
-                                    timestamp = parseTimestamp(threadMsg.ts),
-                                    threadId = ts
-                                )
-                            )
-                            fetched++
-                        }
-                    }
+                    // 스레드 메시지는 별도 검색 대상에서 제외
+                    // (이미 메인 메시지의 답변으로 활용됨)
                 }
                 
                 cursor = response.responseMetadata?.nextCursor
@@ -211,7 +196,7 @@ class SlackRepositoryImpl(
     /**
      * 가장 적절한 답변 찾기 (스레드에서)
      */
-    private fun findBestAnswer(threadMessages: List<com.slack.api.model.Message>, question: String): String {
+    private fun findBestAnswer(threadMessages: List<com.slack.api.model.Message>): String {
         if (threadMessages.isEmpty()) {
             logger.debug("스레드 메시지가 없음")
             return ""
