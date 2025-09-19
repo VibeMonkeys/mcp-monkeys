@@ -1,0 +1,97 @@
+server:
+  port: 8096
+
+spring:
+  application:
+    name: mcp-slack-server
+  ai:
+    mcp:
+      server:
+        enabled: true
+        name: slack-mcp-server
+        version: 1.0.0
+        type: SYNC
+        description: "Slack communication and Q&A automation service"
+        sse-message-endpoint: /mcp/messages
+        capabilities:
+          tool: true
+          resource: false
+          prompt: false
+          completion: true
+    
+  jackson:
+    default-property-inclusion: non_null
+    
+slack:
+  # Bot User OAuth Token (xoxb-로 시작)
+  bot-token: ${SLACK_BOT_TOKEN:xoxb-dummy-token}
+  
+  # App-Level Token for Socket Mode (xapp-로 시작)
+  app-token: ${SLACK_APP_TOKEN:xapp-dummy-token}
+  
+  # Default channel to use if none specified
+  default-channel: ${SLACK_DEFAULT_CHANNEL:general}
+  
+  # Socket Mode settings
+  socket-mode:
+    enabled: ${SLACK_SOCKET_MODE_ENABLED:false}
+    
+  # Event API settings (alternative to Socket Mode)
+  event-api:
+    enabled: ${SLACK_EVENT_API_ENABLED:false}
+    verification-token: ${SLACK_VERIFICATION_TOKEN:}
+
+# Actuator endpoints
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    tags:
+      application: ${spring.application.name}
+
+# Logging
+logging:
+  level:
+    com.monkeys.slack: DEBUG
+    com.slack.api: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+
+# MCP Protocol Configuration
+mcp:
+  server:
+    type: slack
+    version: 1.0.0
+    capabilities:
+      - messaging
+      - threading
+      - reactions
+      - user-info
+      - channel-management
+      - real-time-events
+      - qa-bot
+
+# Simple Universal QA Bot Configuration
+qa-bot:
+  auto-response:
+    enabled: ${QA_BOT_ENABLED:true}
+    response-delay: ${QA_BOT_RESPONSE_DELAY:2000}
+  
+  progressive-loading:
+    enabled: ${QA_BOT_PROGRESSIVE_LOADING:true}
+    partial-result-delay: ${QA_BOT_PARTIAL_RESULT_DELAY:1000}
+    reaction-update-delay: ${QA_BOT_REACTION_DELAY:1000}
+  
+  matching:
+    similarity-threshold: ${QA_BOT_SIMILARITY_THRESHOLD:0.7}
+    keyword-threshold: ${QA_BOT_KEYWORD_THRESHOLD:0.6}
+    history-limit: ${QA_BOT_HISTORY_LIMIT:300}
