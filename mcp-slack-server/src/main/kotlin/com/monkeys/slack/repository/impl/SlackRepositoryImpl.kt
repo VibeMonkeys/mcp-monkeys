@@ -26,6 +26,9 @@ class SlackRepositoryImpl(
     private val cacheExpiry = mutableMapOf<String, Long>()
     private val cacheTimeout = 2 * 60 * 1000L // 2분 캐시
     
+    // 봇 User ID 캐시 (초기화 시 한 번만 조회)
+    private var botUserId: String? = null
+    
     override suspend fun getChannelQAHistory(channel: String, limit: Int): List<SlackQAEntry> {
         logger.info("실제 Slack 채널 메시지 읽기: channel=$channel")
         return getChannelMessages(channel, limit)
@@ -126,8 +129,11 @@ class SlackRepositoryImpl(
                     val user = message.user ?: continue
                     val ts = message.ts ?: continue
                     
-                    // 봇 메시지는 제외
-                    if (message.botId != null) continue
+                    // 봇 메시지는 제외 (botId 또는 봇 User ID로 확인)
+                    if (botUserId == null) {
+                        botUserId = getBotUserId() // 초기 로드
+                    }
+                    if (message.botId != null || user == botUserId) continue
                     
                     // 스레드 답변들도 가져오기
                     val threadMessages = getThreadMessages(channelId, ts)
@@ -204,9 +210,10 @@ class SlackRepositoryImpl(
         
         logger.debug("스레드에서 답변 찾기: ${threadMessages.size}개 메시지")
         
-        // 모든 답변 후보 찾기 (조건 완화)
+        // 모든 답변 후보 찾기 (사람의 답변만)
+        val botId = botUserId // 캐시된 봇 ID 사용
         val answerCandidates = threadMessages
-            .filter { it.botId == null } // 봇 메시지 제외
+            .filter { it.botId == null && it.user != botId } // 봇 메시지 완전 제외
             .mapNotNull { it.text }
             .filter { it.trim().isNotEmpty() }
             .filter { it.length >= 3 } // 최소 3글자 이상
@@ -365,6 +372,28 @@ class SlackRepositoryImpl(
         keysToRemove.forEach { key ->
             channelMessagesCache.remove(key)
             cacheExpiry.remove(key)
+        }
+    }
+    
+    /**
+     * 봇의 User ID 조회 (캐시됨)
+     */
+    private suspend fun getBotUserId(): String? {
+        if (botUserId != null) return botUserId
+        
+        return try {
+            val response = slack.methods(botToken).authTest { req -> req }
+            if (response.isOk) {
+                botUserId = response.userId
+                logger.debug("봇 User ID 획득: $botUserId")
+                botUserId
+            } else {
+                logger.warn("봇 User ID 조회 실패: ${response.error}")
+                null
+            }
+        } catch (e: Exception) {
+            logger.warn("봇 User ID 조회 중 오류", e)
+            null
         }
     }
 }
