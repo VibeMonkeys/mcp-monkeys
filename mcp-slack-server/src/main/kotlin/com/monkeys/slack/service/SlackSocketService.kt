@@ -8,6 +8,7 @@ import com.slack.api.methods.SlackApiException
 import kotlinx.coroutines.*
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
+import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.stereotype.Service
 import org.slf4j.LoggerFactory
 import jakarta.annotation.PostConstruct
@@ -224,7 +225,6 @@ class SlackSocketService(
         try {
             val text = event.get("text")?.asText() ?: return
             val channel = event.get("channel")?.asText() ?: return
-            val user = event.get("user")?.asText() ?: return
             val ts = event.get("ts")?.asText() ?: return
             
             logger.info("🔔 Slack 앱 멘션 수신: '$text' (channel: $channel)")
@@ -297,8 +297,9 @@ class SlackSocketService(
                 removeReaction(channel, ts, "mag")
                 addReaction(channel, ts, "question")
                 
-                // 새로운 질문 안내
-                sendMessage(channel, "새로운 질문이네요! 누군가 답변해 주시면 다음에 도움이 될 것 같아요 💡", ts)
+                // 채널 담당자 멘션
+                val managerMessage = getChannelManagerMessage()
+                sendMessage(channel, managerMessage, ts)
             }
             
         } catch (e: Exception) {
@@ -341,7 +342,7 @@ class SlackSocketService(
                 actualAnswer
             } else {
                 logger.info("답변을 찾지 못함")
-                "이전에 '${result.matchedQuestion}'라는 비슷한 질문이 있었지만 아직 답변이 없는 것 같아요."
+                getChannelManagerMessage()
             }
         }
     }
@@ -601,5 +602,12 @@ class SlackSocketService(
             logger.warn("봇 User ID 조회 중 오류", e)
             null
         }
+    }
+    
+    /**
+     * 채널 담당자 안내 메시지 생성
+     */
+    private fun getChannelManagerMessage(): String {
+        return "새로운 질문이네요! 채널 담당자 님께 문의해주시면 좋을 것 같아요 💡"
     }
 }

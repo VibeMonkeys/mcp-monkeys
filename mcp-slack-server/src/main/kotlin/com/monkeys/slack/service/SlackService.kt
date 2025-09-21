@@ -27,7 +27,11 @@ class SlackService(
             threshold = request.threshold
         )
         
-        val bestMatch = matches.maxByOrNull { it.similarity }
+        // 답변이 있는 것을 우선 선택, 그 다음 유사도 순
+        val bestMatch = matches
+            .filter { it.qaEntry.answer.isNotEmpty() } // 답변이 있는 것만
+            .maxByOrNull { it.similarity } 
+            ?: matches.maxByOrNull { it.similarity } // 답변이 없으면 최고 유사도
         
         return if (bestMatch != null) {
             logger.debug("최적 매치 발견: question='${bestMatch.qaEntry.question}', answer='${bestMatch.qaEntry.answer}'")
@@ -46,7 +50,7 @@ class SlackService(
                 found = false,
                 originalQuestion = request.question,
                 matchedQuestion = null,
-                answer = "유사한 질문을 찾지 못했습니다. 새로운 질문입니다.",
+                answer = "",
                 similarity = 0.0,
                 channel = request.channel,
                 timestamp = System.currentTimeMillis(),
