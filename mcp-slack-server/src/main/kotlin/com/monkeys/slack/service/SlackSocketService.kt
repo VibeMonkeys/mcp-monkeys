@@ -27,6 +27,7 @@ import java.util.concurrent.atomic.AtomicLong
 @ConditionalOnProperty(name = ["slack.socket-mode.enabled"], havingValue = "true")
 class SlackSocketService(
     private val slackService: SlackService,
+    private val slackRepository: com.monkeys.slack.repository.SlackRepository,
     @Value("\${slack.bot-token}") private val botToken: String,
     @Value("\${slack.app-token}") private val appToken: String,
     @Value("\${qa-bot.matching.similarity-threshold:0.3}") private val similarityThreshold: Double
@@ -200,9 +201,14 @@ class SlackSocketService(
             val botId = getBotUserId()
             if (event.get("bot_id") != null || user == botId) return
             
-            // 스레드 메시지는 무시
             val threadTs = event.get("thread_ts")?.asText()
-            if (threadTs != null && threadTs != ts) return
+            
+            if (threadTs != null && threadTs != ts) {
+                // 스레드 메시지 처리 - 답변 학습 목적
+                logger.info("🧵 스레드 메시지 수신: '$text' (channel: $channel, thread: $threadTs)")
+                handleThreadMessage(text, channel, threadTs)
+                return
+            }
             
             logger.info("📨 Slack 메시지 수신: '$text' (channel: $channel)")
             
@@ -240,6 +246,58 @@ class SlackSocketService(
             
         } catch (e: Exception) {
             logger.error("앱 멘션 이벤트 처리 오류", e)
+        }
+    }
+
+    /**
+     * 스레드 메시지 처리 - 답변 학습
+     */
+    private suspend fun handleThreadMessage(text: String, channel: String, threadTs: String) {
+        try {
+            // 답변이 충분히 길고 의미 있는 내용인지 확인 (최소 5글자 이상)
+            if (text.length < 5) return
+            
+            // 질문이 아닌 답변인지 확인 (질문이면 무시)
+            if (isQuestion(text)) {
+                logger.debug("스레드 메시지가 질문이므로 무시: '$text'")
+                return
+            }
+            
+            logger.info("🎯 스레드에서 답변 감지: '$text' - 학습 데이터로 저장 가능")
+            
+            // 스레드 원본 메시지(질문) 가져오기
+            val originalQuestion = getOriginalQuestionFromThread(channel, threadTs)
+            if (originalQuestion.isNotEmpty()) {
+                logger.info("✅ Q&A 학습 완료: 질문='$originalQuestion', 답변='$text'")
+                
+                // 캐시 무효화로 새로운 Q&A가 바로 반영되도록 함
+                val channelName = getChannelNameFromId(channel) ?: "unknown"
+                slackRepository.invalidateCache(channelName)
+                logger.info("🔄 채널 '$channelName' 캐시 무효화 완료 - 다음 검색부터 새 답변 반영")
+            }
+            
+        } catch (e: Exception) {
+            logger.error("스레드 메시지 처리 오류", e)
+        }
+    }
+    
+    /**
+     * 스레드의 원본 질문 가져오기
+     */
+    private suspend fun getOriginalQuestionFromThread(channel: String, threadTs: String): String {
+        return try {
+            val response = slack.methods(botToken).conversationsReplies { req ->
+                req.channel(channel).ts(threadTs).limit(1)
+            }
+            
+            if (response.isOk && !response.messages.isNullOrEmpty()) {
+                response.messages[0].text ?: ""
+            } else {
+                ""
+            }
+        } catch (e: Exception) {
+            logger.debug("원본 질문 가져오기 실패", e)
+            ""
         }
     }
 

@@ -524,6 +524,10 @@ class SlackRepositoryImpl(
         cacheExpiry[key] = System.currentTimeMillis() + cacheTimeout
     }
     
+    override fun invalidateCache(channel: String) {
+        invalidateChannelCache(channel)
+    }
+    
     private fun invalidateChannelCache(channel: String) {
         val keysToRemove = channelMessagesCache.keys.filter { it.startsWith(channel) }
         keysToRemove.forEach { key ->

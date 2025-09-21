@@ -27,4 +27,9 @@ interface SlackRepository {
      * 채널 통계 조회
      */
     suspend fun getChannelStats(channel: String): SlackChannelStats
+    
+    /**
+     * 채널 캐시 무효화 (새로운 Q&A 반영)
+     */
+    fun invalidateCache(channel: String)
 }
