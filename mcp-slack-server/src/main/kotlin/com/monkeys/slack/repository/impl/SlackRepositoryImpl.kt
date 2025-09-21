@@ -2,6 +2,7 @@ package com.monkeys.slack.repository.impl
 
 import com.monkeys.shared.dto.*
 import com.monkeys.slack.repository.SlackRepository
+import com.monkeys.slack.client.IntentAnalyzerClient
 import com.slack.api.Slack
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
@@ -15,7 +16,10 @@ import kotlinx.coroutines.delay
  */
 @Repository
 class SlackRepositoryImpl(
-    @Value("\${slack.bot-token}") private val botToken: String
+    @Value("\${slack.bot-token}") private val botToken: String,
+    @Value("\${intent-analyzer.enabled:true}") private val intentAnalyzerEnabled: Boolean,
+    @Value("\${intent-analyzer.fallback-threshold:0.5}") private val fallbackThreshold: Double,
+    private val intentAnalyzerClient: IntentAnalyzerClient
 ) : SlackRepository {
     
     private val logger = LoggerFactory.getLogger(SlackRepositoryImpl::class.java)
@@ -43,7 +47,7 @@ class SlackRepositoryImpl(
             
             logger.info("채널 메시지 ${messages.size}개에서 검색 중...")
             
-            // 유사도 계산
+            // 유사도 계산 (suspend 함수 호출)
             val matches = messages.mapNotNull { message ->
                 val similarity = calculateSimilarity(question, message.question)
                 if (similarity >= threshold) {
@@ -282,17 +286,134 @@ class SlackRepositoryImpl(
     }
     
     /**
-     * 유사도 계산 (키워드 기반 관대한 버전)
+     * 유사도 계산 (Intent Analyzer + 키워드 기반 폴백)
      */
-    private fun calculateSimilarity(question1: String, question2: String): Double {
+    private suspend fun calculateSimilarity(question1: String, question2: String): Double {
+        // Intent Analyzer 사용 (활성화된 경우)
+        if (intentAnalyzerEnabled) {
+            return calculateSimilarityWithIntentAnalyzer(question1, question2)
+        }
+        
+        // 기존 키워드 기반 계산
+        return calculateSimilarityKeywordBased(question1, question2)
+    }
+    
+    /**
+     * Intent Analyzer를 사용한 유사도 계산
+     */
+    private suspend fun calculateSimilarityWithIntentAnalyzer(question1: String, question2: String): Double {
+        return try {
+            logger.debug("Intent Analyzer로 유사도 계산: '$question1' vs '$question2'")
+            
+            // 두 질문의 의도 분석
+            val intent1 = intentAnalyzerClient.analyzeIntent(question1, "slack")
+            val intent2 = intentAnalyzerClient.analyzeIntent(question2, "slack")
+            
+            if (intent1 == null || intent2 == null) {
+                logger.warn("Intent 분석 실패, 키워드 기반 계산으로 폴백")
+                return calculateSimilarityKeywordBased(question1, question2)
+            }
+            
+            var similarity = 0.0
+            
+            // 1. Intent 타입 유사도 (25% 가중치) - 유사한 intent도 고려
+            val intentSimilarity = calculateIntentSimilarity(intent1.intentType, intent2.intentType)
+            similarity += intentSimilarity * 0.25
+            
+            // 2. 키워드 유사도 (60% 가중치) - 키워드 가중치 더 증가
+            val keywordSimilarity = calculateKeywordSimilarity(intent1.keywords, intent2.keywords)
+            similarity += keywordSimilarity * 0.6
+            
+            // 3. 우선순위 유사도 (10% 가중치)
+            val prioritySimilarity = calculatePrioritySimilarity(intent1.priority, intent2.priority)
+            similarity += prioritySimilarity * 0.1
+            
+            // 4. 감정 톤 유사도 (5% 가중치) - 톤은 덜 중요하게
+            val toneSimilarity = if (intent1.emotionalTone == intent2.emotionalTone) 1.0 else 0.7
+            similarity += toneSimilarity * 0.05
+            
+            logger.debug("Intent 기반 유사도: $similarity (intent=$intentSimilarity, keyword=$keywordSimilarity, priority=$prioritySimilarity, tone=$toneSimilarity)")
+            
+            // 낮은 신뢰도인 경우 키워드 기반 계산과 혼합
+            val confidence = minOf(intent1.confidence, intent2.confidence)
+            if (confidence < fallbackThreshold) {
+                val keywordBased = calculateSimilarityKeywordBased(question1, question2)
+                similarity = (similarity * confidence) + (keywordBased * (1 - confidence))
+                logger.debug("낮은 신뢰도($confidence), 키워드 기반과 혼합: $similarity")
+            }
+            
+            similarity.coerceIn(0.0, 1.0)
+            
+        } catch (e: Exception) {
+            logger.warn("Intent Analyzer 유사도 계산 실패, 키워드 기반으로 폴백", e)
+            calculateSimilarityKeywordBased(question1, question2)
+        }
+    }
+    
+    /**
+     * 키워드 유사도 계산
+     */
+    private fun calculateKeywordSimilarity(keywords1: List<com.monkeys.slack.client.Keyword>, 
+                                          keywords2: List<com.monkeys.slack.client.Keyword>): Double {
+        if (keywords1.isEmpty() || keywords2.isEmpty()) return 0.0
+        
+        val texts1 = keywords1.map { it.text }.toSet()
+        val texts2 = keywords2.map { it.text }.toSet()
+        
+        val intersection = texts1.intersect(texts2).size
+        val union = texts1.union(texts2).size
+        
+        return if (union > 0) intersection.toDouble() / union else 0.0
+    }
+    
+    /**
+     * 우선순위 유사도 계산
+     */
+    private fun calculatePrioritySimilarity(priority1: com.monkeys.slack.client.Priority, 
+                                           priority2: com.monkeys.slack.client.Priority): Double {
+        val p1 = priority1.ordinal
+        val p2 = priority2.ordinal
+        val maxDiff = 4 // P0~P4
+        
+        return 1.0 - (kotlin.math.abs(p1 - p2).toDouble() / maxDiff)
+    }
+    
+    /**
+     * Intent 타입 유사도 계산 (유사한 Intent도 고려)
+     */
+    private fun calculateIntentSimilarity(intent1: String, intent2: String): Double {
+        return when {
+            intent1 == intent2 -> 1.0  // 완전 동일
+            
+            // 질문 관련 intent들은 서로 유사하게 처리
+            (intent1.startsWith("question_") && intent2.startsWith("question_")) -> 0.9
+            
+            // 요청 관련 intent들도 유사하게 처리
+            (intent1.startsWith("request_") && intent2.startsWith("request_")) -> 0.9
+            
+            // 정보 요청 관련 intent들도 유사하게 처리
+            (intent1.startsWith("information_") && intent2.startsWith("information_")) -> 0.9
+            
+            // 도움 요청 관련 intent들도 유사하게 처리
+            (intent1.startsWith("help_") && intent2.startsWith("help_")) -> 0.9
+            
+            // 완전히 다른 카테고리여도 일부 유사도 부여 (더 관대한 매칭)
+            else -> 0.3
+        }
+    }
+    
+    /**
+     * 기존 키워드 기반 유사도 계산
+     */
+    private fun calculateSimilarityKeywordBased(question1: String, question2: String): Double {
         val words1 = tokenize(question1)
         val words2 = tokenize(question2)
         
         if (words1.isEmpty() || words2.isEmpty()) return 0.0
         
-        // 핵심 키워드 추출 (2글자 이상)
-        val keywords1 = words1.filter { it.length >= 2 }
-        val keywords2 = words2.filter { it.length >= 2 }
+        // 핵심 키워드 추출 (1글자 이상으로 완화)
+        val keywords1 = words1.filter { it.length >= 1 }
+        val keywords2 = words2.filter { it.length >= 1 }
         
         if (keywords1.isEmpty() || keywords2.isEmpty()) return 0.0
         
@@ -301,16 +422,52 @@ class SlackRepositoryImpl(
         val partialMatches = keywords1.count { k1 ->
             keywords2.any { k2 -> 
                 k1.contains(k2) || k2.contains(k1) || 
-                // 유사한 키워드 판정 (편집거리 기반)
-                calculateEditDistance(k1, k2) <= 1
+                // 유사한 키워드 판정 (편집거리 기반 - 더 관대하게)
+                calculateEditDistance(k1, k2) <= 2
             }
         }
         
-        // 가중치 점수: 정확 매칭 x2 + 부분 매칭 x1
-        val totalScore = (exactMatches * 2.0) + (partialMatches * 1.0)
-        val maxPossibleScore = maxOf(keywords1.size, keywords2.size) * 2.0
+        // 의미상 유사한 단어들 추가 매칭
+        val semanticMatches = calculateSemanticSimilarity(keywords1, keywords2)
+        
+        // 가중치 점수: 정확 매칭 x3 + 부분 매칭 x2 + 의미 매칭 x1
+        val totalScore = (exactMatches * 3.0) + (partialMatches * 2.0) + (semanticMatches * 1.0)
+        val maxPossibleScore = maxOf(keywords1.size, keywords2.size) * 3.0
         
         return (totalScore / maxPossibleScore).coerceAtMost(1.0)
+    }
+    
+    /**
+     * 의미상 유사한 단어들 매칭
+     */
+    private fun calculateSemanticSimilarity(keywords1: List<String>, keywords2: List<String>): Int {
+        // 한국어 업무 관련 동의어 매핑
+        val synonymGroups = mapOf(
+            setOf("휴가", "연차", "연가", "휴무") to "vacation",
+            setOf("출근", "근무", "업무", "일") to "work",
+            setOf("퇴근", "퇴사", "끝", "마무리") to "finish",
+            setOf("급여", "월급", "임금", "돈", "페이") to "salary",
+            setOf("회의", "미팅", "모임", "만남") to "meeting",
+            setOf("프로젝트", "과제", "업무", "작업") to "project",
+            setOf("문의", "질문", "궁금", "물어") to "question",
+            setOf("신청", "요청", "부탁", "요구") to "request",
+            setOf("승인", "허가", "확인", "검토") to "approval",
+            setOf("시간", "일정", "스케줄", "날짜") to "schedule"
+        )
+        
+        val group1 = keywords1.mapNotNull { word ->
+            synonymGroups.entries.find { (synonyms, _) -> 
+                synonyms.any { synonym -> word.contains(synonym) || synonym.contains(word) }
+            }?.value
+        }.toSet()
+        
+        val group2 = keywords2.mapNotNull { word ->
+            synonymGroups.entries.find { (synonyms, _) -> 
+                synonyms.any { synonym -> word.contains(synonym) || synonym.contains(word) }
+            }?.value
+        }.toSet()
+        
+        return group1.intersect(group2).size
     }
     
     /**

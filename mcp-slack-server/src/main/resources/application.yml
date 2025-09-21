@@ -34,7 +34,7 @@ slack:
   
   # Socket Mode settings
   socket-mode:
-    enabled: ${SLACK_SOCKET_MODE_ENABLED:false}
+    enabled: ${SLACK_SOCKET_MODE_ENABLED:true}
     
   # Event API settings (alternative to Socket Mode)
   event-api:
@@ -92,6 +92,14 @@ qa-bot:
     reaction-update-delay: ${QA_BOT_REACTION_DELAY:1000}
   
   matching:
-    similarity-threshold: ${QA_BOT_SIMILARITY_THRESHOLD:0.7}
-    keyword-threshold: ${QA_BOT_KEYWORD_THRESHOLD:0.6}
+    similarity-threshold: ${QA_BOT_SIMILARITY_THRESHOLD:0.5}
+    keyword-threshold: ${QA_BOT_KEYWORD_THRESHOLD:0.4}
     history-limit: ${QA_BOT_HISTORY_LIMIT:300}
+
+# Intent Analyzer Configuration
+intent-analyzer:
+  host: ${INTENT_ANALYZER_HOST:localhost}
+  port: ${INTENT_ANALYZER_PORT:8097}
+  timeout: ${INTENT_ANALYZER_TIMEOUT:5000}
+  enabled: ${INTENT_ANALYZER_ENABLED:true}
+  fallback-threshold: ${INTENT_ANALYZER_FALLBACK_THRESHOLD:0.5}
