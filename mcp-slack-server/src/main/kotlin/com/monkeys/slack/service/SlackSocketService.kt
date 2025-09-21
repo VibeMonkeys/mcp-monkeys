@@ -254,32 +254,282 @@ class SlackSocketService(
      */
     private suspend fun handleThreadMessage(text: String, channel: String, threadTs: String) {
         try {
-            // 답변이 충분히 길고 의미 있는 내용인지 확인 (최소 5글자 이상)
-            if (text.length < 5) return
+            // 단순한 즉시 처리 대신, 스레드 전체를 분석하여 최적 답변 선택
+            // 일정 시간 후 스레드 전체를 분석하도록 지연 처리
+            logger.info("🧵 스레드 메시지 수신: '$text' - 5초 후 스레드 전체 분석 예정")
             
-            // 질문이 아닌 답변인지 확인 (질문이면 무시)
-            if (isQuestion(text)) {
-                logger.debug("스레드 메시지가 질문이므로 무시: '$text'")
-                return
-            }
-            
-            logger.info("🎯 스레드에서 답변 감지: '$text' - 학습 데이터로 저장 가능")
-            
-            // 스레드 원본 메시지(질문) 가져오기
-            val originalQuestion = getOriginalQuestionFromThread(channel, threadTs)
-            if (originalQuestion.isNotEmpty()) {
-                logger.info("✅ Q&A 학습 완료: 질문='$originalQuestion', 답변='$text'")
-                
-                // 캐시 무효화로 새로운 Q&A가 바로 반영되도록 함
-                val channelName = getChannelNameFromId(channel) ?: "unknown"
-                slackRepository.invalidateCache(channelName)
-                logger.info("🔄 채널 '$channelName' 캐시 무효화 완료 - 다음 검색부터 새 답변 반영")
+            // 5초 후 스레드 전체 분석 (대화가 어느 정도 진행된 후)
+            scope.launch {
+                delay(5000) // 5초 대기
+                analyzeCompleteThread(channel, threadTs)
             }
             
         } catch (e: Exception) {
             logger.error("스레드 메시지 처리 오류", e)
         }
     }
+    
+    /**
+     * 스레드 전체를 분석하여 최적의 답변 찾기
+     */
+    private suspend fun analyzeCompleteThread(channel: String, threadTs: String) {
+        try {
+            logger.info("🔍 스레드 전체 분석 시작: $threadTs")
+            
+            // 스레드 전체 메시지 가져오기
+            val threadMessages = getCompleteThreadMessages(channel, threadTs)
+            if (threadMessages.isEmpty()) return
+            
+            val originalQuestion = threadMessages.firstOrNull()?.text ?: ""
+            if (originalQuestion.isEmpty()) return
+            
+            // 봇 메시지 제외하고 사람의 답변만 추출
+            val botId = getBotUserId()
+            val humanMessages = threadMessages.drop(1) // 첫 번째(질문) 제외
+                .filter { it.botId == null && it.user != botId }
+                .mapNotNull { it.text }
+                .filter { it.trim().isNotEmpty() && it.length >= 10 }
+            
+            if (humanMessages.isEmpty()) {
+                logger.debug("스레드에 의미 있는 답변이 없음")
+                return
+            }
+            
+            // 최적의 답변 선택
+            val bestAnswer = selectBestAnswer(humanMessages)
+            if (bestAnswer.isNotEmpty()) {
+                // 답변 정제 및 LLM 기반 재가공
+                val cleanedAnswer = cleanAnswer(bestAnswer)
+                val formalAnswer = reformatAnswerWithLLM(originalQuestion, cleanedAnswer)
+                logger.info("✅ 스마트 Q&A 학습: 질문='$originalQuestion'")
+                logger.info("   원본 답변: '$bestAnswer'")
+                logger.info("   정제 답변: '$cleanedAnswer'")
+                logger.info("   형식화 답변: '$formalAnswer'")
+                
+                // 정제된 답변으로 Q&A 엔트리 저장
+                val channelName = getChannelNameFromId(channel) ?: "unknown"
+                val qaEntry = com.monkeys.shared.dto.SlackQAEntry(
+                    id = threadTs,
+                    question = originalQuestion,
+                    answer = formalAnswer, // 형식화된 답변 사용
+                    channel = channelName,
+                    author = "learned",
+                    timestamp = System.currentTimeMillis(),
+                    threadId = threadTs
+                )
+                
+                try {
+                    slackRepository.addQAEntry(qaEntry)
+                    logger.info("📚 Q&A 엔트리 저장 완료")
+                } catch (e: Exception) {
+                    logger.warn("Q&A 엔트리 저장 실패", e)
+                }
+                
+                // 캐시 무효화
+                slackRepository.invalidateCache(channelName)
+                logger.info("🔄 채널 '$channelName' 캐시 무효화 완료")
+            }
+            
+        } catch (e: Exception) {
+            logger.error("스레드 분석 오류", e)
+        }
+    }
+    
+    /**
+     * 스레드 전체 메시지 가져오기
+     */
+    private suspend fun getCompleteThreadMessages(channel: String, threadTs: String): List<com.slack.api.model.Message> {
+        return try {
+            val response = slack.methods(botToken).conversationsReplies { req ->
+                req.channel(channel).ts(threadTs).limit(50)
+            }
+            
+            if (response.isOk) {
+                response.messages ?: emptyList()
+            } else {
+                emptyList()
+            }
+        } catch (e: Exception) {
+            logger.debug("스레드 메시지 가져오기 실패", e)
+            emptyList()
+        }
+    }
+    
+    /**
+     * 여러 답변 중 최적의 답변 선택 (AI 기반)
+     */
+    private suspend fun selectBestAnswer(candidateAnswers: List<String>): String {
+        if (candidateAnswers.isEmpty()) return ""
+        if (candidateAnswers.size == 1) return candidateAnswers.first()
+        
+        logger.info("🤔 ${candidateAnswers.size}개 답변 후보 중 AI로 최적 답변 선택 중...")
+        
+        // 1. 질문이 아닌 답변들만 필터링
+        val nonQuestionAnswers = candidateAnswers.filter { !isQuestion(it) }
+        
+        if (nonQuestionAnswers.isEmpty()) {
+            logger.debug("질문이 아닌 답변이 없음")
+            return ""
+        }
+        
+        if (nonQuestionAnswers.size == 1) {
+            return nonQuestionAnswers.first()
+        }
+        
+        // 2. 개선된 품질 기반 선택 (간단하지만 효과적)
+        return try {
+            logger.info("🔍 ${nonQuestionAnswers.size}개 답변을 품질 기준으로 분석 중...")
+            
+            // 각 답변에 대해 품질 점수 계산
+            val scoredAnswers = nonQuestionAnswers.map { answer ->
+                var score = 0.0
+                
+                // 1. 기본 길이 점수 (너무 짧거나 너무 길면 감점)
+                score += when (answer.length) {
+                    in 10..200 -> 1.0    // 적정 길이
+                    in 5..9 -> 0.7       // 짧지만 의미있을 수 있음
+                    in 201..500 -> 0.8   // 조금 길지만 상세할 수 있음
+                    else -> 0.3          // 너무 짧거나 너무 김
+                }
+                
+                // 2. 구체적 정보 포함 여부
+                val infoIndicators = listOf(
+                    "방법", "단계", "절차", "과정", "순서", "먼저", "다음", "그리고",
+                    "클릭", "선택", "입력", "확인", "접속", "실행", "설정", "변경",
+                    "메뉴", "버튼", "화면", "페이지", "링크", "주소", "경로",
+                    "해결", "해답", "답변", "결과", "완료"
+                )
+                val infoCount = infoIndicators.count { answer.contains(it) }
+                score += (infoCount * 0.3).coerceAtMost(1.5)
+                
+                // 3. 완결성 (문장 구조가 완전한지)
+                if (answer.contains(".") || answer.contains("!") || answer.contains("다") || answer.contains("요")) {
+                    score += 0.5
+                }
+                
+                // 4. 단순한 인사말이나 감정표현은 감점
+                val casualExpressions = listOf("ㅋㅋ", "ㅎㅎ", "네네", "아하", "오케이", "굿", "👍", "😊")
+                if (casualExpressions.any { answer.contains(it) } && answer.length < 20) {
+                    score *= 0.3
+                }
+                
+                // 5. 질문형태면 감점 (답변이 아니라 추가 질문일 가능성)
+                if (answer.contains("?") || answer.contains("？")) {
+                    score *= 0.5
+                }
+                
+                Pair(answer, score)
+            }
+            
+            // 최고 점수 답변 선택
+            val bestScoredAnswer = scoredAnswers.maxByOrNull { it.second }
+            val bestAnswer = bestScoredAnswer?.first ?: ""
+            val bestScore = bestScoredAnswer?.second ?: 0.0
+            
+            logger.info("🎯 품질 기반 최적 답변 선택 (점수: ${"%.2f".format(bestScore)}): '${bestAnswer.take(50)}...'")
+            
+            // 최소 품질 기준을 통과한 경우에만 반환
+            if (bestScore >= 1.0) {
+                bestAnswer
+            } else {
+                logger.info("⚠️ 모든 답변이 최소 품질 기준(1.0) 미달, 가장 긴 답변으로 폴백")
+                nonQuestionAnswers.maxByOrNull { it.length } ?: ""
+            }
+            
+        } catch (e: Exception) {
+            logger.warn("답변 품질 분석 실패, 가장 긴 답변으로 폴백", e)
+            nonQuestionAnswers.maxByOrNull { it.length } ?: ""
+        }
+    }
+    
+    /**
+     * 답변 정제 - 불필요한 예의 표현 제거하되 핵심 내용은 유지
+     */
+    private fun cleanAnswer(rawAnswer: String): String {
+        var cleaned = rawAnswer.trim()
+        
+        // 문장 끝의 불필요한 예의 표현 제거
+        val unnecessaryEndings = listOf(
+            "감사합니다!*".toRegex(),
+            "감사해요!*".toRegex(), 
+            "고맙습니다!*".toRegex(),
+            "고마워요!*".toRegex(),
+            "네네!*".toRegex(),
+            "네네$".toRegex(),
+            "ㅋㅋ+!*$".toRegex(),
+            "ㅎㅎ+!*$".toRegex(),
+            "👍+$".toRegex(),
+            "😊+$".toRegex(),
+            "굿!*$".toRegex(),
+            "좋아요!*$".toRegex()
+        )
+        
+        // 문장 끝에서 불필요한 표현들 제거
+        for (pattern in unnecessaryEndings) {
+            cleaned = cleaned.replace(pattern, "").trim()
+        }
+        
+        // 중간에 있는 불필요한 이모지나 표현 제거
+        cleaned = cleaned
+            .replace("ㅋㅋ+".toRegex(), "") // 중간의 ㅋㅋ
+            .replace("ㅎㅎ+".toRegex(), "") // 중간의 ㅎㅎ
+            .replace("\\s+".toRegex(), " ") // 여러 공백을 하나로
+            .trim()
+        
+        // 의미있는 마침표나 느낌표는 유지하되, 연속된 것은 하나로
+        cleaned = cleaned
+            .replace("!+".toRegex(), "!")
+            .replace("\\.+".toRegex(), ".")
+        
+        // 마지막에 마침표가 없고 완전한 문장인 경우 마침표 추가
+        if (cleaned.isNotEmpty() && 
+            !cleaned.endsWith(".") && 
+            !cleaned.endsWith("!") && 
+            !cleaned.endsWith("?") &&
+            (cleaned.contains("입니다") || cleaned.contains("됩니다") || cleaned.contains("해요"))) {
+            cleaned += "."
+        }
+        
+        return cleaned
+    }
+    
+    /**
+     * LLM을 사용하여 답변을 형식적이고 포멀한 형태로 재가공
+     */
+    private suspend fun reformatAnswerWithLLM(question: String, cleanedAnswer: String): String {
+        return try {
+            logger.debug("LLM으로 답변 재가공 시작: '$cleanedAnswer'")
+            
+            val reformatPrompt = buildString {
+                append("다음 질문과 답변을 분석해서, 답변을 회사 공식 Q&A 형태로 재작성해주세요.\n\n")
+                append("**요구사항:**\n")
+                append("1. 형식적이고 포멀한 톤으로 작성\n")
+                append("2. 핵심 정보는 정확히 유지\n")
+                append("3. 간결하고 명확하게 표현\n")
+                append("4. 한국어 존댓말 사용\n")
+                append("5. 불확실한 표현('같아요', '아마') 제거\n\n")
+                append("**질문:** $question\n")
+                append("**원본 답변:** $cleanedAnswer\n\n")
+                append("**재작성된 답변:**")
+            }
+            
+            val result = slackRepository.reformatAnswerWithGemini(reformatPrompt)
+            
+            // Gemini 직접 호출 결과 처리
+            if (result.isNotEmpty() && result != cleanedAnswer) {
+                logger.info("🔄 Gemini 재가공 성공: '$result'")
+                result
+            } else {
+                logger.info("⚠️ Gemini 재가공 실패, 정제된 답변 사용")
+                cleanedAnswer
+            }
+            
+        } catch (e: Exception) {
+            logger.warn("LLM 답변 재가공 실패, 정제된 답변 사용", e)
+            cleanedAnswer
+        }
+    }
+    
     
     /**
      * 스레드의 원본 질문 가져오기
