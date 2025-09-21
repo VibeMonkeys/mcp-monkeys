@@ -1,0 +1,94 @@
+syntax = "proto3";
+
+package intent;
+
+option go_package = "github.com/monkeys/mcp-intent-analyzer/proto/intent";
+
+import "google/protobuf/timestamp.proto";
+
+// 의도분석기 서비스 정의
+service IntentAnalyzer {
+  // 핵심 의도 분석
+  rpc AnalyzeIntent(IntentRequest) returns (IntentResponse);
+  
+  // 헬스체크
+  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+}
+
+// 의도 분석 요청
+message IntentRequest {
+  string text = 1;                              // 분석할 텍스트
+  string domain = 2;                            // 플랫폼 도메인 (slack, jira 등)
+  string user_id = 3;                           // 사용자 식별자
+  string session_id = 4;                        // 대화 세션
+  repeated string context_messages = 5;         // 맥락을 위한 이전 메시지
+  map<string, string> metadata = 6;             // 플랫폼별 메타데이터
+  google.protobuf.Timestamp timestamp = 7;     // 요청 타임스탬프
+}
+
+// 의도 분석 응답
+message IntentResponse {
+  string intent_type = 1;                       // 주요 의도 분류
+  string domain_specific_intent = 2;            // 플랫폼별 세부 의도
+  repeated Keyword keywords = 3;                // 가중치가 있는 추출된 키워드
+  double confidence = 4;                        // 모델 신뢰도 (0.0-1.0)
+  Priority priority = 5;                        // 긴급도 분류
+  EmotionalTone emotional_tone = 6;             // 감정 분석
+  map<string, double> intent_scores = 7;        // 모든 의도 확률
+  ProcessingMetrics metrics = 8;                // 성능 지표
+  string reasoning = 9;                         // 분석 근거
+}
+
+// 키워드 정보
+message Keyword {
+  string text = 1;                              // 키워드 텍스트
+  double weight = 2;                            // 가중치
+  string category = 3;                          // 카테고리 (기술적, 도메인, 액션 등)
+}
+
+// 우선순위 열거형
+enum Priority {
+  PRIORITY_UNSPECIFIED = 0;
+  PRIORITY_LOW = 1;           // P4 - 낮음
+  PRIORITY_MEDIUM = 2;        // P3 - 보통
+  PRIORITY_HIGH = 3;          // P2 - 높음
+  PRIORITY_URGENT = 4;        // P1 - 긴급
+  PRIORITY_CRITICAL = 5;      // P0 - 중대
+}
+
+// 감정 톤 열거형
+enum EmotionalTone {
+  TONE_NEUTRAL = 0;
+  TONE_POSITIVE = 1;
+  TONE_NEGATIVE = 2;
+  TONE_FRUSTRATED = 3;
+  TONE_URGENT = 4;
+  TONE_GRATEFUL = 5;
+}
+
+// 성능 지표
+message ProcessingMetrics {
+  int64 processing_time_ms = 1;                 // 전체 처리 시간
+  int64 gemini_api_time_ms = 2;                 // Gemini API 호출 시간
+  int64 cache_hit_count = 3;                    // 캐시 히트 횟수
+  string model_version = 4;                     // 사용된 모델 버전
+  bool cache_hit = 5;                           // 캐시에서 응답했는지 여부
+}
+
+// 헬스체크 요청
+message HealthCheckRequest {
+  string service = 1;                           // 체크할 서비스명 (선택사항)
+}
+
+// 헬스체크 응답
+message HealthCheckResponse {
+  enum ServingStatus {
+    UNKNOWN = 0;
+    SERVING = 1;
+    NOT_SERVING = 2;
+    SERVICE_UNKNOWN = 3;
+  }
+  ServingStatus status = 1;
+  string message = 2;                           // 추가 상태 메시지
+  map<string, string> details = 3;             // 상세 정보
+}
