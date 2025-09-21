@@ -324,6 +324,12 @@ class SlackRepositoryImpl(
             val keywordSimilarity = calculateKeywordSimilarity(intent1.keywords, intent2.keywords)
             similarity += keywordSimilarity * 0.6
             
+            // 키워드 유사도가 너무 낮으면 매칭하지 않음 (핵심 키워드가 다른 경우)
+            if (keywordSimilarity < 0.5) {
+                logger.debug("키워드 유사도가 너무 낮음 ($keywordSimilarity), 매칭 제외")
+                return 0.0
+            }
+            
             // 3. 우선순위 유사도 (10% 가중치)
             val prioritySimilarity = calculatePrioritySimilarity(intent1.priority, intent2.priority)
             similarity += prioritySimilarity * 0.1
@@ -555,6 +561,64 @@ class SlackRepositoryImpl(
         } catch (e: Exception) {
             logger.warn("봇 User ID 조회 중 오류", e)
             null
+        }
+    }
+    
+    override suspend fun analyzeIntentForAnswer(prompt: String): com.monkeys.slack.client.IntentAnalysisResult? {
+        return try {
+            if (intentAnalyzerEnabled) {
+                logger.debug("Intent Analyzer로 답변 선택 분석: '$prompt'")
+                intentAnalyzerClient.analyzeIntent(prompt, "slack")
+            } else {
+                logger.debug("Intent Analyzer 비활성화됨")
+                null
+            }
+        } catch (e: Exception) {
+            logger.warn("Intent 분석 실패", e)
+            null
+        }
+    }
+    
+    override suspend fun reformatAnswerWithGemini(prompt: String): String {
+        return try {
+            logger.debug("Gemini API로 답변 재가공: '$prompt'")
+            
+            // Intent Analyzer 클라이언트를 통해 Gemini API 호출
+            // 하지만 결과는 의도분석이 아닌 텍스트 생성으로 사용
+            val result = intentAnalyzerClient.analyzeIntent(prompt, "answer_reformat")
+            
+            // 키워드에서 재작성된 답변 추출
+            val reformattedText = result?.keywords
+                ?.mapNotNull { keyword ->
+                    val text = keyword.text.trim()
+                    // 재작성된 답변 패턴 찾기
+                    when {
+                        text.contains("재작성된 답변:") -> {
+                            text.substringAfter("재작성된 답변:").trim()
+                        }
+                        text.contains("답변:") -> {
+                            text.substringAfter("답변:").trim()
+                        }
+                        text.length > 10 && !text.contains("요구사항") && !text.contains("분석") -> {
+                            text // 의미있는 긴 텍스트
+                        }
+                        else -> null
+                    }
+                }
+                ?.filter { it.isNotEmpty() }
+                ?.maxByOrNull { it.length } // 가장 긴 것 선택
+            
+            if (!reformattedText.isNullOrEmpty()) {
+                logger.debug("Gemini 재가공 성공: '$reformattedText'")
+                reformattedText
+            } else {
+                logger.debug("Gemini 재가공 결과 없음")
+                ""
+            }
+            
+        } catch (e: Exception) {
+            logger.warn("Gemini API 답변 재가공 실패", e)
+            ""
         }
     }
 }

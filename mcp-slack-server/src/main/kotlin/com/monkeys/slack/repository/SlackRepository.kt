@@ -32,4 +32,14 @@ interface SlackRepository {
      * 채널 캐시 무효화 (새로운 Q&A 반영)
      */
     fun invalidateCache(channel: String)
+    
+    /**
+     * 답변 선택을 위한 Intent 분석 (AI 기반 답변 선택용)
+     */
+    suspend fun analyzeIntentForAnswer(prompt: String): com.monkeys.slack.client.IntentAnalysisResult?
+    
+    /**
+     * Gemini API를 직접 호출하여 답변 재가공
+     */
+    suspend fun reformatAnswerWithGemini(prompt: String): String
 }
