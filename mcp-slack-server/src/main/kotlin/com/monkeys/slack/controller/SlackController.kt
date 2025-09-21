@@ -108,9 +108,6 @@ class SlackController(
         logger.info("캐시 무효화 요청")
         
         return try {
-            // Repository에서 캐시 무효화
-            // slackService.invalidateCache() // 필요시 구현
-            
             ResponseEntity.ok(mapOf(
                 "status" to "SUCCESS",
                 "message" to "캐시가 무효화되었습니다. 다음 검색에서 최신 데이터를 읽습니다.",
