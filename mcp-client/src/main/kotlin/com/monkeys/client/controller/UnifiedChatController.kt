@@ -3,6 +3,7 @@ package com.monkeys.client.controller
 import com.monkeys.client.service.chat.BasicChatService
 import com.monkeys.client.service.chat.StructuredResponseService
 import com.monkeys.client.service.chat.StreamingChatService
+import com.monkeys.client.service.ToolDiscoveryService
 import com.monkeys.client.exception.ChatServiceException
 import com.monkeys.shared.dto.*
 import org.springframework.http.ResponseEntity
@@ -21,7 +22,8 @@ import org.springframework.http.MediaType
 class UnifiedChatController(
     private val basicChatService: BasicChatService,
     private val structuredResponseService: StructuredResponseService,
-    private val streamingChatService: StreamingChatService
+    private val streamingChatService: StreamingChatService,
+    private val toolDiscoveryService: ToolDiscoveryService
 ) {
     private val logger = LoggerFactory.getLogger(UnifiedChatController::class.java)
 
@@ -85,44 +87,25 @@ class UnifiedChatController(
     }
 
     @GetMapping("/tools")
-    fun getAvailableTools(): ResponseEntity<BaseResponse<Map<String, Map<String, String>>>> {
-        val tools = mapOf(
-            "Library" to mapOf(
-                "searchBooks" to "도서를 검색합니다",
-                "getBookByIsbn" to "ISBN으로 도서를 조회합니다",
-                "getAvailableBooks" to "대출 가능한 도서 목록을 조회합니다",
-                "borrowBook" to "도서를 대출합니다",
-                "returnBook" to "도서를 반납합니다",
-                "getOverdueLoans" to "연체 대출 목록을 조회합니다",
-                "getLibraryStats" to "도서관 통계를 조회합니다"
-            ),
-            "Todo" to mapOf(
-                "createTodoList" to "할일 목록을 생성합니다",
-                "createTodo" to "할일을 생성합니다",
-                "getMyTodos" to "내 할일 목록을 조회합니다",
-                "completeTodo" to "할일을 완료합니다",
-                "getOverdueTodos" to "기한 초과 할일을 조회합니다",
-                "getTodoStats" to "할일 통계를 조회합니다"
-            ),
-            "Employee" to mapOf(
-                "searchEmployees" to "직원을 검색합니다",
-                "getEmployeeByNumber" to "사번으로 직원을 조회합니다",
-                "getEmployeesByDepartment" to "부서별 직원 목록을 조회합니다",
-                "changeDepartment" to "부서를 변경합니다",
-                "updateSalary" to "급여를 변경합니다",
-                "getEmployeeStats" to "직원 통계를 조회합니다"
-            ),
-            "Product" to mapOf(
-                "searchProducts" to "상품을 검색합니다",
-                "findProductBySku" to "SKU로 상품을 조회합니다",
-                "addStock" to "재고를 추가합니다",
-                "removeStock" to "재고를 차감합니다",
-                "getLowStockProducts" to "재고 부족 상품을 조회합니다",
-                "getProductStats" to "상품 통계를 조회합니다"
-            )
-        )
+    fun getAvailableTools(): ResponseEntity<BaseResponse<Map<String, List<Map<String, String>>>>> {
+        val tools = toolDiscoveryService.getAvailableTools()
+            .mapValues { (_, toolInfoList) ->
+                toolInfoList.map { toolInfo ->
+                    mapOf(
+                        "name" to toolInfo.name,
+                        "description" to toolInfo.description
+                    )
+                }
+            }
 
-        return ResponseEntity.ok(BaseResponse.success(tools, "사용 가능한 도구 목록"))
+        val totalCount = tools.values.sumOf { it.size }
+        return ResponseEntity.ok(BaseResponse.success(tools, "사용 가능한 도구 목록 (총 ${totalCount}개)"))
+    }
+
+    @GetMapping("/tools/summary")
+    fun getToolsSummary(): ResponseEntity<BaseResponse<Map<String, Int>>> {
+        val summary = toolDiscoveryService.getToolsSummary()
+        return ResponseEntity.ok(BaseResponse.success(summary, "서버별 도구 개수"))
     }
 
     @GetMapping("/status")
