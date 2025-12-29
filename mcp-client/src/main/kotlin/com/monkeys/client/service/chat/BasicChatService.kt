@@ -53,11 +53,12 @@ class BasicChatService(
                 contextMessages = conversationContext.split("사용자:").size - 1
             )
             
-            val response = chatClient.prompt()
+            val chatResponse = chatClient.prompt()
                 .user(prompt)
                 .system(chatResponseHelper.getBasicSystemMessage())
                 .call()
-                .content() ?: "응답을 생성할 수 없습니다."
+
+            val response = chatResponse.content() ?: "응답을 생성할 수 없습니다."
             
             logger.debug("응답 생성 완료: responseLength=${response.length}, sessionId=$sessionId")
             

@@ -6,6 +6,7 @@ import com.monkeys.client.service.AiMetricsService
 import com.monkeys.client.service.common.ChatResponseHelper
 import com.monkeys.client.service.ChatServiceException
 import org.springframework.ai.chat.client.ChatClient
+import org.springframework.ai.converter.BeanOutputConverter
 import org.springframework.stereotype.Service
 import org.slf4j.LoggerFactory
 
@@ -40,22 +41,45 @@ class StructuredResponseService(
         
         try {
             val responseType = chatResponseHelper.determineResponseType(request.message)
-            
+            val converter = BeanOutputConverter(responseType)
+            val structuredPrompt = chatResponseHelper.buildStructuredPrompt(
+                request.message,
+                converter.format
+            )
+
             logger.debug("응답 타입 결정: ${responseType.simpleName}, sessionId=$sessionId")
-            
-            val structuredResponse = chatClient.prompt()
-                .user(request.message)
+
+            val chatResponse = chatClient.prompt()
                 .system(chatResponseHelper.getStructuredSystemMessage())
+                .user(structuredPrompt)
                 .call()
-                .entity(responseType)
-            
-            // 기본 검증
-            val validatedResponse = structuredResponse ?: "응답 생성 실패"
+
+            val rawResponse = chatResponse.content()?.trim()
+                ?: throw ChatServiceException(
+                    "모델이 비어 있는 응답을 반환했습니다.",
+                    "EMPTY_RESPONSE"
+                )
+
+            val validatedResponse: Any = try {
+                converter.convert(rawResponse)
+            } catch (ex: Exception) {
+                logger.error("구조화된 응답 파싱 실패: sessionId=$sessionId", ex)
+                throw ChatServiceException(
+                    "응답을 구조화된 형식으로 변환할 수 없습니다: ${ex.message}",
+                    "STRUCTURED_PARSING_FAILED",
+                    ex
+                )
+            } ?: throw ChatServiceException(
+                "구조화된 응답이 비어 있습니다.",
+                "STRUCTURED_EMPTY_RESULT"
+            )
             
             logger.debug("구조화된 응답 생성 완료: type=${responseType.simpleName}, sessionId=$sessionId")
             
-            // 성공 메트릭 기록
-            val estimatedTokens = chatResponseHelper.estimateTokenCount(request.message + validatedResponse.toString())
+            // 성공 메트릭 기록 (응답 문자열은 DTO toString을 활용하여 추정)
+            val estimatedTokens = chatResponseHelper.estimateTokenCount(
+                structuredPrompt + rawResponse
+            )
             aiMetricsService.recordResponse(
                 sample = metricsSample,
                 modelName = ChatResponseHelper.MODEL_NAME,
