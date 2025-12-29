@@ -1,8 +1,8 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    kotlin("jvm") version "1.9.25"
-    kotlin("plugin.spring") version "1.9.25"
+    kotlin("jvm") version "2.2.21"
+    kotlin("plugin.spring") version "2.2.21"
     id("java-library")
 }
 
@@ -22,13 +22,13 @@ repositories {
 
 dependencies {
     implementation("org.jetbrains.kotlin:kotlin-reflect")
-    implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.16.1")
-    implementation("com.fasterxml.jackson.core:jackson-annotations:2.16.1")
-    implementation("org.springframework.boot:spring-boot-starter-web:3.5.4")
-    implementation("org.springframework:spring-context:6.2.0")
+    implementation("tools.jackson.module:jackson-module-kotlin:3.0.3")
+    implementation("com.fasterxml.jackson.core:jackson-annotations:2.20")
+    implementation("org.springframework.boot:spring-boot-starter-web:4.0.1")
+    implementation("org.springframework:spring-context:7.0.1")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    implementation("io.micrometer:micrometer-core:1.11.5")
-    implementation("org.slf4j:slf4j-api:2.0.9")
+    implementation("io.micrometer:micrometer-core:1.15.0")
+    implementation("org.slf4j:slf4j-api:2.0.16")
 }
 
 kotlin {

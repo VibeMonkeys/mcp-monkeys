@@ -3,8 +3,9 @@ package com.monkeys.shared.util
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
-import com.fasterxml.jackson.module.kotlin.readValue
+import tools.jackson.module.kotlin.jsonMapper
+import tools.jackson.module.kotlin.kotlinModule
+import tools.jackson.module.kotlin.readValue
 import org.slf4j.LoggerFactory
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.Timer
@@ -18,7 +19,7 @@ class ApiClient(
     private val meterRegistry: MeterRegistry,
     private val serviceName: String
 ) {
-    private val mapper = jacksonObjectMapper()
+    private val mapper = jsonMapper { addModule(kotlinModule()) }
     private val logger = LoggerFactory.getLogger(ApiClient::class.java)
     
     private val apiTimer = Timer.builder("api.request")

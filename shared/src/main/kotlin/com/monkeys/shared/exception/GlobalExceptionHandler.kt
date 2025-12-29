@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException
-import com.fasterxml.jackson.core.JsonProcessingException
+import tools.jackson.core.JacksonException
 import java.util.concurrent.TimeoutException
 
 /**
@@ -64,8 +64,8 @@ class GlobalExceptionHandler {
     /**
      * JSON 파싱 예외 처리
      */
-    @ExceptionHandler(JsonProcessingException::class)
-    fun handleJsonProcessingException(e: JsonProcessingException): ResponseEntity<BaseResponse<Any>> {
+    @ExceptionHandler(JacksonException::class)
+    fun handleJacksonException(e: JacksonException): ResponseEntity<BaseResponse<Any>> {
         logger.error("JSON 파싱 예외: {}", e.message, e)
         
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(

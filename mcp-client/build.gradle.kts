@@ -1,9 +1,9 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    kotlin("jvm") version "1.9.25"
-    kotlin("plugin.spring") version "1.9.25"
-    id("org.springframework.boot") version "3.5.4"
+    kotlin("jvm") version "2.2.21"
+    kotlin("plugin.spring") version "2.2.21"
+    id("org.springframework.boot") version "4.0.1"
     id("io.spring.dependency-management") version "1.1.7"
 }
 
@@ -21,7 +21,7 @@ repositories {
     mavenCentral()
 }
 
-extra["springAiVersion"] = "1.0.1"
+extra["springAiVersion"] = "2.0.0-M1"
 
 dependencyManagement {
     imports {
@@ -35,7 +35,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-validation")
-    implementation("org.springframework.retry:spring-retry")
+    implementation("org.springframework.retry:spring-retry:2.0.12")
     implementation("org.springframework:spring-aspects")
     implementation("com.h2database:h2")
     implementation("org.springframework.ai:spring-ai-starter-mcp-client-webflux")
@@ -52,7 +52,7 @@ dependencies {
     implementation("com.google.apis:google-api-services-gmail:v1-rev20231218-2.0.0")
     implementation("com.sun.mail:javax.mail:1.6.2")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
+    implementation("tools.jackson.module:jackson-module-kotlin")
     implementation(project(":shared"))
     
     // Testing
