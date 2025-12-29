@@ -1,7 +1,7 @@
 package com.monkeys.weather.integration
 
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import tools.jackson.module.kotlin.jsonMapper
+import tools.jackson.module.kotlin.kotlinModule
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable
@@ -23,9 +23,9 @@ class WeatherIntegrationTest {
 
     @LocalServerPort
     private var port: Int = 0
-    
+
     private val webClient = WebClient.create()
-    private val mapper = jacksonObjectMapper()
+    private val mapper = jsonMapper { addModule(kotlinModule()) }
 
     @Test
     @DisplayName("헬스 체크 엔드포인트 테스트")
@@ -40,10 +40,10 @@ class WeatherIntegrationTest {
         // Then
         assertNotNull(response)
         val healthJson = mapper.readTree(response)
-        assertTrue(healthJson.get("status").asText() == "UP")
+        assertTrue(healthJson.get("status").asString() == "UP")
     }
 
-    @Test  
+    @Test
     @DisplayName("MCP 서버 정보 엔드포인트 테스트")
     fun `mcp endpoint should return server info`() {
         // When
@@ -57,7 +57,7 @@ class WeatherIntegrationTest {
         assertNotNull(response)
         val mcpJson = mapper.readTree(response)
         assertTrue(mcpJson.has("name"))
-        assertTrue(mcpJson.get("name").asText().contains("weather"))
+        assertTrue(mcpJson.get("name").asString().contains("weather"))
         assertTrue(mcpJson.has("version"))
         assertTrue(mcpJson.has("capabilities"))
     }
@@ -72,7 +72,7 @@ class WeatherIntegrationTest {
             .bodyToMono(String::class.java)
             .block()
 
-        // Then  
+        // Then
         assertNotNull(response)
         assertTrue(response.contains("# HELP"))
         assertTrue(response.contains("# TYPE"))
@@ -94,24 +94,28 @@ class WeatherIntegrationTest {
         assertNotNull(metricsResponse)
         val metricsJson = mapper.readTree(metricsResponse)
         assertTrue(metricsJson.has("names"))
-        
-        val metricNames = metricsJson.get("names").map { it.asText() }
+
+        val namesNode = metricsJson.get("names")
+        val metricNames = mutableListOf<String>()
+        for (i in 0 until namesNode.size()) {
+            metricNames.add(namesNode.get(i).asString())
+        }
         assertTrue(metricNames.contains("jvm.memory.used"))
         assertTrue(metricNames.contains("http.server.requests"))
     }
 
-    @EnabledIfEnvironmentVariable(named = "WEATHER_API_KEY", matches = ".+", 
+    @EnabledIfEnvironmentVariable(named = "WEATHER_API_KEY", matches = ".+",
         disabledReason = "실제 API 키가 설정된 경우에만 실행")
     @Test
     @DisplayName("실제 Weather API 연동 테스트 (API 키 필요)")
     fun `should call real weather api when key is provided`() {
         // 이 테스트는 WEATHER_API_KEY 환경변수가 설정된 경우에만 실행됩니다.
         // 실제 외부 API 호출을 테스트하므로 CI/CD에서는 건너뛰어집니다.
-        
+
         // Given - 실제 API 키가 설정되어 있음
-        
+
         // When - 실제 날씨 API 호출 (서비스 로직을 통해)
-        
+
         // Then - 실제 데이터가 반환되는지 확인
         assertTrue(true, "실제 API 테스트는 환경변수가 설정된 경우에만 실행")
     }

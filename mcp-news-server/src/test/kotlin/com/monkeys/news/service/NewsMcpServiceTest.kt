@@ -1,244 +1,181 @@
 package com.monkeys.news.service
 
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry
-import okhttp3.OkHttpClient
+import com.monkeys.shared.dto.*
+import io.mockk.every
+import io.mockk.mockk
+import io.mockk.verify
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
 
 @DisplayName("NewsMcpService 단위 테스트")
 class NewsMcpServiceTest {
 
+    private lateinit var newsService: NewsService
+    private lateinit var newsMcpService: NewsMcpService
+
+    @BeforeEach
+    fun setUp() {
+        newsService = mockk()
+        newsMcpService = NewsMcpService(newsService)
+    }
+
     @Nested
-    @DisplayName("더미 API 키로 테스트")
-    inner class DummyApiKeyTest {
+    @DisplayName("헤드라인 조회 테스트")
+    inner class GetTopHeadlinesTest {
 
         @Test
-        @DisplayName("최신 뉴스 헤드라인 조회 - API 키 미설정")
-        fun `should return dummy headlines when api key is not set`() {
+        @DisplayName("한국 뉴스 헤드라인 조회 성공")
+        fun `should return top headlines for Korea`() {
             // Given
-            val service = NewsMcpService(
-                "dummy-key", 
-                OkHttpClient(),
-                SimpleMeterRegistry()
+            val expectedArticles = listOf(
+                NewsArticle(
+                    title = "테스트 뉴스 제목",
+                    description = "테스트 뉴스 설명",
+                    url = "https://example.com/news/1",
+                    urlToImage = "https://example.com/image.jpg",
+                    publishedAt = "2024-01-01T12:00:00Z",
+                    source = "Test Source",
+                    author = "Test Author",
+                    content = "테스트 뉴스 내용"
+                )
             )
-            
+            every { newsService.getTopHeadlines(any()) } returns expectedArticles
+
             // When
-            val headlines = service.getTopHeadlines("kr")
-            
+            val result = newsMcpService.getTopHeadlines("kr", "general", 10)
+
             // Then
-            assertNotNull(headlines)
-            assertEquals(1, headlines.size)
-            
-            val headline = headlines[0]
-            assertEquals("테스트 뉴스 제목 (headlines)", headline.title)
-            assertTrue(headline.description.contains("API 키가 설정되지 않았습니다"))
-            assertEquals("테스트 작성자", headline.author)
-            assertEquals("테스트 출처", headline.source)
+            assertNotNull(result)
+            assertEquals(1, result.size)
+            assertEquals("테스트 뉴스 제목", result[0].title)
+            verify { newsService.getTopHeadlines(any()) }
         }
 
         @Test
-        @DisplayName("뉴스 검색 - API 키 미설정")
-        fun `should return dummy search results when api key is not set`() {
+        @DisplayName("다른 카테고리 뉴스 조회")
+        fun `should handle different categories`() {
             // Given
-            val service = NewsMcpService(
-                "dummy-key", 
-                OkHttpClient(),
-                SimpleMeterRegistry()
+            val expectedArticles = listOf(
+                NewsArticle(
+                    title = "기술 뉴스",
+                    description = "기술 관련 뉴스",
+                    url = "https://example.com/tech/1",
+                    urlToImage = "",
+                    publishedAt = "2024-01-01T12:00:00Z",
+                    source = "Tech Source",
+                    author = "Unknown",
+                    content = "기술 뉴스 내용"
+                )
             )
-            
-            // When
-            val results = service.searchNews("테스트")
-            
-            // Then
-            assertNotNull(results)
-            assertEquals(1, results.size)
-            
-            val result = results[0]
-            assertEquals("테스트 뉴스 제목 (search)", result.title)
-            assertTrue(result.description.contains("News API 키가 설정되지 않았습니다"))
-            assertEquals("테스트 작성자", result.author)
-            assertEquals("테스트 출처", result.source)
-        }
+            every { newsService.getTopHeadlines(any()) } returns expectedArticles
 
-        @Test
-        @DisplayName("출처별 뉴스 조회 - API 키 미설정")
-        fun `should return dummy source news when api key is not set`() {
-            // Given
-            val service = NewsMcpService(
-                "dummy-key", 
-                OkHttpClient(),
-                SimpleMeterRegistry()
-            )
-            
             // When
-            val sourceNews = service.getNewsBySource("cnn")
-            
+            val result = newsMcpService.getTopHeadlines("us", "technology", 5)
+
             // Then
-            assertNotNull(sourceNews)
-            assertEquals(1, sourceNews.size)
-            
-            val news = sourceNews[0]
-            assertEquals("테스트 뉴스 제목 (source)", news.title)
-            assertTrue(news.description.contains("News API 키가 설정되지 않았습니다"))
-            assertEquals("테스트 작성자", news.author)
-            assertEquals("테스트 출처", news.source)
+            assertNotNull(result)
+            assertEquals("기술 뉴스", result[0].title)
         }
     }
 
     @Nested
-    @DisplayName("매개변수 테스트")
-    inner class ParameterTest {
+    @DisplayName("뉴스 검색 테스트")
+    inner class SearchNewsTest {
 
         @Test
-        @DisplayName("다양한 국가 코드로 헤드라인 조회")
-        fun `should handle different country codes`() {
+        @DisplayName("키워드로 뉴스 검색 성공")
+        fun `should search news by keyword`() {
             // Given
-            val service = NewsMcpService(
-                "dummy-key", 
-                OkHttpClient(),
-                SimpleMeterRegistry()
+            val expectedArticles = listOf(
+                NewsArticle(
+                    title = "AI 관련 뉴스",
+                    description = "인공지능 기술 발전",
+                    url = "https://example.com/ai/1",
+                    urlToImage = "https://example.com/ai.jpg",
+                    publishedAt = "2024-01-01T12:00:00Z",
+                    source = "AI News",
+                    author = "AI Reporter",
+                    content = "AI 뉴스 내용"
+                )
             )
-            
-            // When
-            val krHeadlines = service.getTopHeadlines("kr", "business", 5)
-            val usHeadlines = service.getTopHeadlines("us", "technology", 10)
-            
-            // Then
-            assertEquals(1, krHeadlines.size)
-            assertEquals(1, usHeadlines.size)
-        }
+            every { newsService.searchNews(any()) } returns expectedArticles
 
-        @Test
-        @DisplayName("다양한 검색 매개변수 처리")
-        fun `should handle different search parameters`() {
-            // Given
-            val service = NewsMcpService(
-                "dummy-key", 
-                OkHttpClient(),
-                SimpleMeterRegistry()
-            )
-            
             // When
-            val relevancyResults = service.searchNews("AI", "relevancy", "en", 20)
-            val popularityResults = service.searchNews("코로나", "popularity", "ko", 15)
-            
-            // Then
-            assertEquals(1, relevancyResults.size)
-            assertEquals(1, popularityResults.size)
-        }
+            val result = newsMcpService.searchNews("AI", "relevancy", "ko", 10)
 
-        @Test
-        @DisplayName("다양한 출처 도메인 처리")
-        fun `should handle different source domains`() {
-            // Given
-            val service = NewsMcpService(
-                "dummy-key", 
-                OkHttpClient(),
-                SimpleMeterRegistry()
-            )
-            
-            // When
-            val cnnNews = service.getNewsBySource("cnn", 10)
-            val bbcNews = service.getNewsBySource("bbc-news", 5)
-            val techcrunchNews = service.getNewsBySource("techcrunch", 15)
-            
             // Then
-            assertEquals(1, cnnNews.size)
-            assertEquals(1, bbcNews.size)
-            assertEquals(1, techcrunchNews.size)
+            assertNotNull(result)
+            assertEquals(1, result.size)
+            assertEquals("AI 관련 뉴스", result[0].title)
+            verify { newsService.searchNews(any()) }
         }
     }
 
     @Nested
-    @DisplayName("데이터 검증 테스트")
-    inner class DataValidationTest {
+    @DisplayName("출처별 뉴스 조회 테스트")
+    inner class GetNewsBySourceTest {
 
         @Test
-        @DisplayName("뉴스 데이터 구조 검증")
-        fun `should return proper news article structure`() {
+        @DisplayName("특정 출처 뉴스 조회 성공")
+        fun `should get news by source`() {
             // Given
-            val service = NewsMcpService(
-                "dummy-key", 
-                OkHttpClient(),
-                SimpleMeterRegistry()
+            val expectedArticles = listOf(
+                NewsArticle(
+                    title = "BBC 뉴스",
+                    description = "BBC에서 보도한 뉴스",
+                    url = "https://bbc.com/news/1",
+                    urlToImage = "https://bbc.com/image.jpg",
+                    publishedAt = "2024-01-01T12:00:00Z",
+                    source = "BBC News",
+                    author = "BBC Reporter",
+                    content = "BBC 뉴스 내용"
+                )
             )
-            
+            every { newsService.getNewsBySource(any()) } returns expectedArticles
+
             // When
-            val headlines = service.getTopHeadlines()
-            
+            val result = newsMcpService.getNewsBySource("bbc-news", 10)
+
             // Then
-            val article = headlines[0]
-            assertNotNull(article.title)
-            assertNotNull(article.description)
-            assertNotNull(article.author)
-            assertNotNull(article.source)
-            assertNotNull(article.url)
-            assertNotNull(article.urlToImage)
-            assertNotNull(article.publishedAt)
-            assertNotNull(article.content)
+            assertNotNull(result)
+            assertEquals(1, result.size)
+            assertEquals("BBC News", result[0].source)
+            verify { newsService.getNewsBySource(any()) }
         }
+    }
+
+    @Nested
+    @DisplayName("데이터 구조 검증")
+    inner class DataStructureTest {
 
         @Test
-        @DisplayName("빈 검색어 처리")
-        fun `should handle empty search query gracefully`() {
+        @DisplayName("NewsArticle 데이터 구조")
+        fun `should have correct NewsArticle structure`() {
             // Given
-            val service = NewsMcpService(
-                "dummy-key", 
-                OkHttpClient(),
-                SimpleMeterRegistry()
+            val article = NewsArticle(
+                title = "테스트 제목",
+                description = "테스트 설명",
+                url = "https://example.com/news",
+                urlToImage = "https://example.com/image.jpg",
+                publishedAt = "2024-01-01T12:00:00Z",
+                source = "Test Source",
+                author = "Test Author",
+                content = "테스트 내용"
             )
-            
-            // When
-            val emptyResults = service.searchNews("")
-            val blankResults = service.searchNews("   ")
-            
-            // Then
-            assertEquals(1, emptyResults.size)
-            assertEquals(1, blankResults.size)
-        }
 
-        @Test
-        @DisplayName("특수문자 포함 검색어 처리")
-        fun `should handle special characters in search query`() {
-            // Given
-            val service = NewsMcpService(
-                "dummy-key", 
-                OkHttpClient(),
-                SimpleMeterRegistry()
-            )
-            
-            // When
-            val specialCharResults = service.searchNews("코로나19 & 백신 100% 효과")
-            val urlEncodingResults = service.searchNews("https://example.com?param=test")
-            
             // Then
-            assertEquals(1, specialCharResults.size)
-            assertEquals(1, urlEncodingResults.size)
-        }
-
-        @Test
-        @DisplayName("기본값 매개변수 테스트")
-        fun `should use default parameters correctly`() {
-            // Given
-            val service = NewsMcpService(
-                "dummy-key", 
-                OkHttpClient(),
-                SimpleMeterRegistry()
-            )
-            
-            // When
-            val defaultHeadlines = service.getTopHeadlines()
-            val defaultSearch = service.searchNews("test")
-            val defaultSourceNews = service.getNewsBySource("cnn")
-            
-            // Then
-            assertEquals(1, defaultHeadlines.size)
-            assertEquals(1, defaultSearch.size)
-            assertEquals(1, defaultSourceNews.size)
+            assertEquals("테스트 제목", article.title)
+            assertEquals("테스트 설명", article.description)
+            assertEquals("https://example.com/news", article.url)
+            assertEquals("https://example.com/image.jpg", article.urlToImage)
+            assertEquals("2024-01-01T12:00:00Z", article.publishedAt)
+            assertEquals("Test Source", article.source)
+            assertEquals("Test Author", article.author)
+            assertEquals("테스트 내용", article.content)
         }
     }
 }
