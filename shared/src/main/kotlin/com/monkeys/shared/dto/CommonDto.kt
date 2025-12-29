@@ -136,6 +136,7 @@ data class ChatResponse(
     val sessionId: String?,
     
     @JsonPropertyDescription("사용된 도구 목록")
+    @JsonProperty("tools_used")
     val usedTools: List<String>? = null,
     
     @JsonPropertyDescription("응답 시각")

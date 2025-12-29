@@ -42,6 +42,21 @@ $conversationContext
             """.trimIndent()
         }
     }
+
+    /**
+     * 구조화된 응답을 위한 프롬프트 구성
+     * 모델이 BeanOutputConverter 포맷을 따르도록 구체적인 지시를 포함
+     */
+    fun buildStructuredPrompt(userMessage: String, schemaFormat: String): String {
+        return """
+사용자 요청: $userMessage
+
+위 요청에 답변할 때 아래 JSON 스키마를 반드시 따르세요.
+모든 필드는 지정된 타입에 맞춰 응답하고, 필요한 경우 예시 값을 참고하세요.
+
+$schemaFormat
+        """.trimIndent()
+    }
     
     /**
      * 토큰 수 추정 (대략적인 계산)
