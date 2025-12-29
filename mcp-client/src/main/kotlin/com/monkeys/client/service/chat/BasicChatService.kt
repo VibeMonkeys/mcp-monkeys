@@ -5,7 +5,7 @@ import com.monkeys.shared.dto.ChatResponse
 import com.monkeys.client.service.AiMetricsService
 import com.monkeys.client.service.ConversationMemoryService
 import com.monkeys.client.service.common.ChatResponseHelper
-import com.monkeys.client.service.ChatServiceException
+import com.monkeys.client.exception.ChatServiceException
 import org.springframework.ai.chat.client.ChatClient
 import org.springframework.stereotype.Service
 import org.slf4j.LoggerFactory

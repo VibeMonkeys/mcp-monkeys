@@ -4,7 +4,7 @@ import com.monkeys.shared.dto.ChatRequest
 import com.monkeys.shared.dto.StructuredChatResponse
 import com.monkeys.client.service.AiMetricsService
 import com.monkeys.client.service.common.ChatResponseHelper
-import com.monkeys.client.service.ChatServiceException
+import com.monkeys.client.exception.ChatServiceException
 import org.springframework.ai.chat.client.ChatClient
 import org.springframework.ai.converter.BeanOutputConverter
 import org.springframework.stereotype.Service
