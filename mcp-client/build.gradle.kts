@@ -47,11 +47,7 @@ dependencies {
     implementation("io.micrometer:micrometer-tracing-bridge-otel")
     implementation("io.opentelemetry:opentelemetry-exporter-zipkin")
     
-    // External APIs (Gmail 관련 - Vertex AI와 분리)
-    implementation("com.google.api-client:google-api-client:2.2.0")
-    implementation("com.google.apis:google-api-services-gmail:v1-rev20231218-2.0.0")
-    implementation("com.sun.mail:javax.mail:1.6.2")
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    // Jackson Kotlin 모듈
     implementation("tools.jackson.module:jackson-module-kotlin")
     implementation(project(":shared"))
     

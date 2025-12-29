@@ -69,6 +69,11 @@ interface ConversationHistoryRepository : JpaRepository<ConversationHistory, Str
      * 특정 기간보다 오래된 대화 기록 삭제
      */
     fun deleteByCreatedAtBefore(cutoffTime: LocalDateTime): Int
+
+    /**
+     * 세션 ID로 모든 대화 기록 삭제
+     */
+    fun deleteBySessionId(sessionId: String): Int
     
     /**
      * 모든 활성 세션 ID 조회 (최근 24시간 내 대화가 있는)
