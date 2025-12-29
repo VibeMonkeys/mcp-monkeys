@@ -25,18 +25,18 @@ spring:
         sse:
           transport-mode: WEBFLUX
           connections:
-            weather:
-              url: http://localhost:8092
-              name: weather-mcp-server
-            news:
-              url: http://localhost:8093
-              name: news-mcp-server
-            translate:
-              url: http://localhost:8094
-              name: translate-mcp-server
-            calendar:
-              url: http://localhost:8095
-              name: calendar-mcp-server
+            library:
+              url: http://localhost:8091
+              name: library-mcp-server
+            todo:
+              url: http://localhost:8096
+              name: todo-mcp-server
+            employee:
+              url: http://localhost:8097
+              name: employee-mcp-server
+            product:
+              url: http://localhost:8098
+              name: product-mcp-server
   datasource:
     url: jdbc:h2:mem:testdb
     driverClassName: org.h2.Driver
@@ -51,30 +51,16 @@ spring:
     console:
       enabled: true
 
-# API Settings - Configure these environment variables
-api:
-  github:
-    token: ${GITHUB_TOKEN:dummy-token}
-  jira:
-    url: ${JIRA_URL:https://your-domain.atlassian.net}
-    email: ${JIRA_EMAIL:dummy@email.com}
-    token: ${JIRA_TOKEN:dummy-token}
-  gmail:
-    client-id: ${GMAIL_CLIENT_ID:dummy-client-id}
-    client-secret: ${GMAIL_CLIENT_SECRET:dummy-client-secret}
-    refresh-token: ${GMAIL_REFRESH_TOKEN:dummy-refresh-token}
-  slack:
-    bot-token: ${SLACK_BOT_TOKEN:xoxb-dummy-token}
-    
+# MCP Server URLs (환경변수로 오버라이드 가능)
 mcp:
-  weather:
-    url: ${MCP_WEATHER_URL:http://localhost:8092}
-  news:
-    url: ${MCP_NEWS_URL:http://localhost:8093}
-  translate:
-    url: ${MCP_TRANSLATE_URL:http://localhost:8094}
-  calendar:
-    url: ${MCP_CALENDAR_URL:http://localhost:8095}
+  library:
+    url: ${MCP_LIBRARY_URL:http://localhost:8091}
+  todo:
+    url: ${MCP_TODO_URL:http://localhost:8096}
+  employee:
+    url: ${MCP_EMPLOYEE_URL:http://localhost:8097}
+  product:
+    url: ${MCP_PRODUCT_URL:http://localhost:8098}
 
 management:
   endpoints:
