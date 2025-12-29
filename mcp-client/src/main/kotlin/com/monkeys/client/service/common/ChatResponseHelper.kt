@@ -1,7 +1,6 @@
 package com.monkeys.client.service.common
 
-import com.monkeys.shared.dto.*
-import com.monkeys.client.dto.MultiServiceResponse
+import com.monkeys.client.dto.*
 import org.springframework.stereotype.Component
 import org.slf4j.LoggerFactory
 
@@ -80,18 +79,26 @@ $schemaFormat
      */
     fun determineResponseType(message: String): Class<*> {
         return when {
-            message.contains("날씨", ignoreCase = true) || 
-            message.contains("weather", ignoreCase = true) -> WeatherResponse::class.java
-            
-            message.contains("뉴스", ignoreCase = true) || 
-            message.contains("news", ignoreCase = true) -> NewsResponse::class.java
-            
-            message.contains("번역", ignoreCase = true) || 
-            message.contains("translate", ignoreCase = true) -> TranslationResponse::class.java
-            
-            message.contains("일정", ignoreCase = true) || 
-            message.contains("calendar", ignoreCase = true) -> CalendarResponse::class.java
-            
+            message.contains("도서", ignoreCase = true) ||
+            message.contains("책", ignoreCase = true) ||
+            message.contains("대출", ignoreCase = true) ||
+            message.contains("library", ignoreCase = true) ||
+            message.contains("book", ignoreCase = true) -> LibraryResponse::class.java
+
+            message.contains("할일", ignoreCase = true) ||
+            message.contains("todo", ignoreCase = true) ||
+            message.contains("task", ignoreCase = true) -> TodoResponse::class.java
+
+            message.contains("직원", ignoreCase = true) ||
+            message.contains("사원", ignoreCase = true) ||
+            message.contains("부서", ignoreCase = true) ||
+            message.contains("employee", ignoreCase = true) -> EmployeeResponse::class.java
+
+            message.contains("상품", ignoreCase = true) ||
+            message.contains("재고", ignoreCase = true) ||
+            message.contains("product", ignoreCase = true) ||
+            message.contains("inventory", ignoreCase = true) -> ProductResponse::class.java
+
             else -> MultiServiceResponse::class.java
         }
     }

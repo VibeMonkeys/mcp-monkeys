@@ -89,21 +89,21 @@ data class PagedResponse<T>(
 )
 
 /**
- * API 상태 결과 DTO
+ * MCP 서버 상태 결과 DTO
  */
-data class ApiStatusResult(
-    @JsonPropertyDescription("GitHub 상태")
-    val github: String,
-    
-    @JsonPropertyDescription("Jira 상태")
-    val jira: String,
-    
-    @JsonPropertyDescription("Gmail 상태")
-    val gmail: String,
-    
-    @JsonPropertyDescription("Slack 상태")
-    val slack: String,
-    
+data class McpServerStatusResult(
+    @JsonPropertyDescription("Library 서버 상태")
+    val library: String,
+
+    @JsonPropertyDescription("Todo 서버 상태")
+    val todo: String,
+
+    @JsonPropertyDescription("Employee 서버 상태")
+    val employee: String,
+
+    @JsonPropertyDescription("Product 서버 상태")
+    val product: String,
+
     @JsonPropertyDescription("확인 시각")
     val timestamp: Long
 )
