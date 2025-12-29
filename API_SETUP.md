@@ -1,176 +1,188 @@
-# API 설정 가이드
+# 환경 설정 가이드
 
-이 문서는 MCP Monkeys 프로젝트에서 각 외부 API를 설정하는 방법을 설명합니다.
+MCP Monkeys 프로젝트 실행을 위한 환경 설정 방법입니다.
 
-## 📋 환경변수 설정
+## 환경변수 설정
 
-다음 환경변수들을 설정하면 바로 API 연동이 가능합니다:
+### 필수 설정 (Gemini API 사용 시)
 
 ```bash
-# GitHub API
-export GITHUB_TOKEN="your-github-token"
-
-# Jira API
-export JIRA_URL="https://your-domain.atlassian.net"
-export JIRA_EMAIL="your-email@company.com"
-export JIRA_TOKEN="your-jira-api-token"
-
-# Gmail API
-export GMAIL_CLIENT_ID="your-client-id.googleusercontent.com"
-export GMAIL_CLIENT_SECRET="your-client-secret"
-export GMAIL_REFRESH_TOKEN="your-refresh-token"
-
-# Slack API
-export SLACK_BOT_TOKEN="xoxb-your-bot-token"
-
-# OpenAI API (필수)
-export OPENAI_API_KEY="your-openai-api-key"
-
-# MCP Server APIs (선택사항)
-export WEATHER_API_KEY="your-openweathermap-api-key"
-export NEWS_API_KEY="your-newsapi-key"
+# Google Cloud 설정
+export GOOGLE_CLOUD_PROJECT="your-project-id"
+export GOOGLE_CLOUD_LOCATION="asia-northeast1"
 ```
 
-## 🔧 각 API 설정 방법
+### Google Cloud 프로젝트 설정
 
-### 1. GitHub API 설정
+1. Google Cloud Console 접속: https://console.cloud.google.com
+2. 새 프로젝트 생성 또는 기존 프로젝트 선택
+3. Vertex AI API 활성화:
+   ```bash
+   gcloud services enable aiplatform.googleapis.com
+   ```
+4. 인증 설정:
+   ```bash
+   gcloud auth application-default login
+   ```
 
-1. GitHub > Settings > Developer settings > Personal access tokens
-2. "Generate new token" 클릭
-3. 필요한 스코프 선택:
-   - `repo` (저장소 접근)
-   - `read:user` (사용자 정보)
-   - `read:org` (조직 정보)
-4. 생성된 토큰을 `GITHUB_TOKEN`으로 설정
+## 서버 포트 구성
 
-**테스트 명령:**
+| 서비스 | 포트 | 설명 |
+|--------|------|------|
+| MCP Client | 8090 | 통합 클라이언트 |
+| Library Server | 8091 | 도서관리 |
+| Todo Server | 8096 | 할일관리 |
+| Employee Server | 8097 | 직원관리 |
+| Product Server | 8098 | 상품관리 |
+| React Frontend | 3004 | 웹 UI |
+
+## 빠른 시작
+
+### 1. 전체 MCP 서버 실행
+
 ```bash
-curl -H "Authorization: Bearer $GITHUB_TOKEN" https://api.github.com/user
+# 백그라운드로 모든 서버 시작
+./gradlew :mcp-library-server:bootRun --args='--server.port=8091' &
+./gradlew :mcp-todo-server:bootRun --args='--server.port=8096' &
+./gradlew :mcp-employee-server:bootRun --args='--server.port=8097' &
+./gradlew :mcp-product-server:bootRun --args='--server.port=8098' &
+
+# 통합 클라이언트 실행
+GOOGLE_CLOUD_PROJECT="your-project-id" \
+GOOGLE_CLOUD_LOCATION="asia-northeast1" \
+./gradlew :mcp-client:bootRun --args='--server.port=8090'
 ```
 
-### 2. Jira API 설정
+### 2. 상태 확인
 
-1. Jira > 계정 설정 > 보안 > API 토큰 생성
-2. 토큰 생성 후 이메일과 함께 설정
-3. Basic 인증 사용 (이메일:토큰을 Base64 인코딩)
-
-**테스트 명령:**
 ```bash
-curl -u "$JIRA_EMAIL:$JIRA_TOKEN" "$JIRA_URL/rest/api/3/myself"
-```
+# MCP 서버 연결 상태
+curl http://localhost:8090/api/health/mcp-servers
 
-### 3. Gmail API 설정
+# 전체 시스템 상태
+curl http://localhost:8090/api/health/comprehensive
 
-1. Google Cloud Console > API 및 서비스 > 사용자 인증 정보
-2. OAuth 2.0 클라이언트 ID 생성
-3. OAuth Playground에서 refresh token 생성:
-   - https://developers.google.com/oauthplayground/
-   - Gmail API v1 스코프 사용
-   - Authorization Code로 refresh token 획득
-
-**필요한 스코프:**
-- `https://www.googleapis.com/auth/gmail.readonly`
-- `https://www.googleapis.com/auth/gmail.send`
-
-### 4. Slack API 설정
-
-1. Slack App 생성: https://api.slack.com/apps
-2. OAuth & Permissions에서 Bot Token Scopes 추가:
-   - `chat:write` (메시지 전송)
-   - `channels:history` (채널 히스토리 읽기)
-   - `channels:read` (채널 목록 읽기)
-3. 워크스페이스에 앱 설치
-4. Bot User OAuth Token 사용
-
-**테스트 명령:**
-```bash
-curl -H "Authorization: Bearer $SLACK_BOT_TOKEN" https://slack.com/api/auth.test
-```
-
-## 🚀 빠른 시작
-
-1. 환경변수 설정 후 애플리케이션 실행:
-```bash
-./gradlew :mcp-client:bootRun
-```
-
-2. API 상태 확인:
-```bash
-curl -X POST http://localhost:8090/api/api-status
-```
-
-3. 사용 가능한 도구 확인:
-```bash
+# 사용 가능한 도구 목록
 curl http://localhost:8090/api/tools
 ```
 
-4. AI와 대화 시작:
-```bash
-curl -X POST http://localhost:8090/api/chat \
-  -H "Content-Type: application/json" \
-  -d '{"message": "GitHub에서 내 저장소 목록을 가져와줘"}'
-```
+### 3. 프론트엔드 실행
 
-## 🛠️ 사용 가능한 도구들
-
-### 직접 API 연동 (mcp-client 내장)
-#### GitHub
-- `getGitHubIssues`: 저장소 이슈 조회
-- `createGitHubIssue`: 새 이슈 생성
-
-#### Jira
-- `getJiraIssues`: 프로젝트 이슈 조회
-- `createJiraIssue`: 새 이슈 생성
-
-#### Gmail
-- `getGmailMessages`: 메일 목록 조회
-- `sendGmailMessage`: 메일 발송
-
-#### Slack
-- `sendSlackMessage`: 메시지 전송
-- `getSlackMessages`: 채널 메시지 조회
-
-### MCP 서버를 통한 연동 (포트 8092-8095)
-#### Weather Server (8092)
-- `getCurrentWeather`: 현재 날씨 조회
-- `getWeatherForecast`: 날씨 예보 조회
-- `compareWeather`: 여러 도시 날씨 비교
-
-#### News Server (8093)
-- `getTopHeadlines`: 최신 뉴스 헤드라인
-- `searchNews`: 키워드로 뉴스 검색
-- `getNewsBySource`: 특정 출처의 뉴스 조회
-
-#### Translation Server (8094)
-- (구현 예정)
-
-#### Calendar Server (8095)
-- (구현 예정)
-
-### 시스템
-- `checkAllApiStatus`: 모든 API 연결 상태 확인
-
-## 🔍 문제 해결
-
-### "dummy-token" 오류
-- 환경변수가 제대로 설정되지 않았습니다
-- 애플리케이션 재시작 필요
-
-### "Authentication Failed" 오류
-- API 토큰/인증 정보가 올바르지 않습니다
-- 토큰 만료 여부 확인
-
-### "Connection Failed" 오류
-- 네트워크 연결 문제
-- API 엔드포인트 URL 확인
-
-## 📱 프론트엔드 연동
-
-React 프론트엔드는 포트 3004에서 실행됩니다:
 ```bash
 cd mcp-front
 npm install
 npm run dev
 ```
 
-브라우저에서 http://localhost:3004 접속하여 UI를 통해 테스트할 수 있습니다.
+브라우저에서 http://localhost:3004 접속
+
+## MCP 서버별 도구
+
+### Library Server (8091)
+
+| 도구 | 설명 |
+|------|------|
+| searchBooks | 도서 검색 |
+| getBookByIsbn | ISBN으로 도서 조회 |
+| getAvailableBooks | 대출 가능 도서 |
+| borrowBook | 도서 대출 |
+| returnBook | 도서 반납 |
+| extendLoan | 대출 연장 |
+| getOverdueLoans | 연체 목록 |
+| getLibraryStats | 통계 |
+
+### Todo Server (8096)
+
+| 도구 | 설명 |
+|------|------|
+| createTodoList | 목록 생성 |
+| getTodoLists | 목록 조회 |
+| createTodo | 할일 생성 |
+| getMyTodos | 내 할일 |
+| searchTodos | 할일 검색 |
+| startTodo | 시작 |
+| completeTodo | 완료 |
+| cancelTodo | 취소 |
+| getOverdueTodos | 기한 초과 |
+| getTodoStats | 통계 |
+
+### Employee Server (8097)
+
+| 도구 | 설명 |
+|------|------|
+| searchEmployees | 직원 검색 |
+| getEmployeeByNumber | 사번 조회 |
+| getEmployeesByDepartment | 부서별 조회 |
+| changeDepartment | 부서 이동 |
+| changePosition | 직급 변경 |
+| updateSalary | 급여 변경 |
+| takeLeave | 휴직 |
+| returnFromLeave | 복직 |
+| resignEmployee | 퇴사 |
+| getEmployeeStats | 통계 |
+
+### Product Server (8098)
+
+| 도구 | 설명 |
+|------|------|
+| searchProducts | 상품 검색 |
+| findProductBySku | SKU 조회 |
+| findProductsByCategory | 카테고리별 |
+| findProductsByBrand | 브랜드별 |
+| addStock | 재고 추가 |
+| removeStock | 재고 차감 |
+| getLowStockProducts | 재고 부족 |
+| activateProduct | 활성화 |
+| deactivateProduct | 비활성화 |
+| getProductStats | 통계 |
+
+## AI 채팅 사용 예시
+
+```bash
+# 도서 검색
+curl -X POST http://localhost:8090/api/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "클린코드 책 찾아줘"}'
+
+# 할일 생성
+curl -X POST http://localhost:8090/api/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "내일까지 보고서 작성 할일 추가해줘"}'
+
+# 직원 검색
+curl -X POST http://localhost:8090/api/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "개발팀 직원 목록 보여줘"}'
+
+# 재고 확인
+curl -X POST http://localhost:8090/api/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "재고 부족한 상품 알려줘"}'
+
+# 복합 질의
+curl -X POST http://localhost:8090/api/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "개발팀 직원들 조회하고, IT 도서 중 재고 부족한 것도 알려줘"}'
+```
+
+## 문제 해결
+
+### "Connection refused" 오류
+
+- 해당 MCP 서버가 실행 중인지 확인
+- 포트 번호가 올바른지 확인
+
+### "Registered tools: 0" 로그
+
+- `ToolCallbackProvider` 빈이 등록되어 있는지 확인
+- MCP_TOOL_REGISTRATION_GUIDE.md 참조
+
+### LazyInitializationException 오류
+
+- MCP 서비스 클래스에 `@Transactional(readOnly = true)` 추가
+- 엔티티 연관관계 접근 시 트랜잭션 내에서 처리
+
+### H2 Database 오류
+
+- `schema.sql` 및 `data.sql` 파일 확인
+- `application.yml`의 `spring.sql.init.mode: always` 설정 확인
