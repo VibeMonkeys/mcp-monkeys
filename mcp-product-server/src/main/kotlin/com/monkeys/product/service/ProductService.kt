@@ -186,7 +186,10 @@ class ProductService(
         val categories = categoryRepository.count()
 
         val totalValue = products.filter { it.status != ProductStatus.DISCONTINUED }
-            .sumOf { (it.inventory?.quantity ?: 0) * it.price.toInt() }
+            .fold(BigDecimal.ZERO) { acc, product ->
+                val quantity = BigDecimal(product.inventory?.quantity ?: 0)
+                acc + (quantity * product.price)
+            }
 
         return ProductStats(
             totalProducts = products.size,
@@ -196,7 +199,7 @@ class ProductService(
             discontinuedProducts = discontinued,
             lowStockProducts = lowStock,
             totalCategories = categories,
-            totalInventoryValue = BigDecimal(totalValue)
+            totalInventoryValue = totalValue
         )
     }
 }
