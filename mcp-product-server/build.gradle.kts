@@ -33,6 +33,9 @@ dependencyManagement {
 }
 
 dependencies {
+    // Shared Module
+    implementation(project(":shared"))
+
     // Kotlin
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core")

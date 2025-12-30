@@ -1,6 +1,7 @@
 package com.monkeys.todo.service
 
 import com.monkeys.todo.entity.*
+import com.monkeys.shared.util.ValidationUtils
 import org.slf4j.LoggerFactory
 import org.springframework.ai.tool.annotation.Tool
 import org.springframework.ai.tool.annotation.ToolParam
@@ -34,8 +35,10 @@ class TodoMcpService(
         @ToolParam(description = "소유자 이메일", required = true)
         ownerEmail: String
     ): TodoListInfo {
-        logger.info("MCP Tool 호출: createTodoList - name=$name, owner=$ownerEmail")
-        val todoList = todoService.createList(name, description, ownerEmail)
+        val validatedName = ValidationUtils.requireNotBlank(name, "목록 이름")
+        val validatedEmail = ValidationUtils.validateEmail(ownerEmail, "소유자 이메일")
+        logger.info("MCP Tool 호출: createTodoList - name=$validatedName, owner=$validatedEmail")
+        val todoList = todoService.createList(validatedName, description, validatedEmail)
         return todoList.toInfo()
     }
 
@@ -47,8 +50,9 @@ class TodoMcpService(
         @ToolParam(description = "소유자 이메일", required = true)
         ownerEmail: String
     ): List<TodoListInfo> {
-        logger.info("MCP Tool 호출: getTodoLists - owner=$ownerEmail")
-        return todoService.findListsByOwner(ownerEmail).map { it.toInfo() }
+        val validatedEmail = ValidationUtils.validateEmail(ownerEmail, "소유자 이메일")
+        logger.info("MCP Tool 호출: getTodoLists - owner=$validatedEmail")
+        return todoService.findListsByOwner(validatedEmail).map { it.toInfo() }
     }
 
     @Tool(
@@ -83,7 +87,9 @@ class TodoMcpService(
         @ToolParam(description = "마감일 (YYYY-MM-DD 형식)")
         dueDate: String? = null
     ): TodoResult {
-        logger.info("MCP Tool 호출: createTodo - listId=$listId, title=$title")
+        ValidationUtils.requirePositive(listId, "목록 ID")
+        val validatedTitle = ValidationUtils.requireNotBlank(title, "할일 제목")
+        logger.info("MCP Tool 호출: createTodo - listId=$listId, title=$validatedTitle")
 
         val priorityEnum = try {
             Priority.valueOf(priority.uppercase())
@@ -95,7 +101,7 @@ class TodoMcpService(
             try { LocalDate.parse(it) } catch (e: Exception) { null }
         }
 
-        val todo = todoService.createTodo(listId, title, description, priorityEnum, dueDateParsed)
+        val todo = todoService.createTodo(listId, validatedTitle, description, priorityEnum, dueDateParsed)
         return if (todo != null) {
             TodoResult(
                 success = true,

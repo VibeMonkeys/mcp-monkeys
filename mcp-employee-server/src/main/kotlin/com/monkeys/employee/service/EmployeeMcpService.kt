@@ -1,6 +1,7 @@
 package com.monkeys.employee.service
 
 import com.monkeys.employee.entity.*
+import com.monkeys.shared.util.ValidationUtils
 import org.slf4j.LoggerFactory
 import org.springframework.ai.tool.annotation.Tool
 import org.springframework.ai.tool.annotation.ToolParam
@@ -30,8 +31,9 @@ class EmployeeMcpService(
         @ToolParam(description = "검색할 직원 이름", required = true)
         name: String
     ): List<EmployeeInfo> {
-        logger.info("MCP Tool 호출: searchEmployees - name=$name")
-        return employeeService.searchEmployees(name).map { it.toInfo() }
+        val validatedName = ValidationUtils.requireNotBlank(name, "직원 이름")
+        logger.info("MCP Tool 호출: searchEmployees - name=$validatedName")
+        return employeeService.searchEmployees(validatedName).map { it.toInfo() }
     }
 
     @Tool(
@@ -146,6 +148,8 @@ class EmployeeMcpService(
         @ToolParam(description = "새 급여", required = true)
         newSalary: Double
     ): EmployeeResult {
+        ValidationUtils.requirePositive(employeeId, "직원 ID")
+        ValidationUtils.requirePositive(newSalary, "급여")
         logger.info("MCP Tool 호출: updateSalary - employeeId=$employeeId, newSalary=$newSalary")
 
         val employee = employeeService.updateSalary(employeeId, BigDecimal.valueOf(newSalary))

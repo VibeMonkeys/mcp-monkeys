@@ -1,6 +1,7 @@
 package com.monkeys.library.service
 
 import com.monkeys.library.entity.*
+import com.monkeys.shared.util.ValidationUtils
 import org.slf4j.LoggerFactory
 import org.springframework.ai.tool.annotation.Tool
 import org.springframework.ai.tool.annotation.ToolParam
@@ -31,8 +32,9 @@ class LibraryMcpService(
         @ToolParam(description = "검색할 키워드 (도서 제목)", required = true)
         keyword: String
     ): List<BookInfo> {
-        logger.info("MCP Tool 호출: searchBooks - keyword=$keyword")
-        return libraryService.searchBooks(keyword).map { it.toInfo() }
+        val validatedKeyword = ValidationUtils.requireNotBlank(keyword, "검색 키워드")
+        logger.info("MCP Tool 호출: searchBooks - keyword=$validatedKeyword")
+        return libraryService.searchBooks(validatedKeyword).map { it.toInfo() }
     }
 
     @Tool(
@@ -108,9 +110,12 @@ class LibraryMcpService(
         @ToolParam(description = "대출자 이메일", required = true)
         borrowerEmail: String
     ): LoanResult {
-        logger.info("MCP Tool 호출: borrowBook - bookId=$bookId, borrower=$borrowerName")
+        ValidationUtils.requirePositive(bookId, "도서 ID")
+        val validatedName = ValidationUtils.requireNotBlank(borrowerName, "대출자 이름")
+        val validatedEmail = ValidationUtils.validateEmail(borrowerEmail, "대출자 이메일")
+        logger.info("MCP Tool 호출: borrowBook - bookId=$bookId, borrower=$validatedName")
 
-        val loan = libraryService.borrowBook(bookId, borrowerName, borrowerEmail)
+        val loan = libraryService.borrowBook(bookId, validatedName, validatedEmail)
         return if (loan != null) {
             LoanResult(
                 success = true,
@@ -189,8 +194,9 @@ class LibraryMcpService(
         @ToolParam(description = "대출자 이메일", required = true)
         email: String
     ): List<LoanInfo> {
-        logger.info("MCP Tool 호출: getMyLoans - email=$email")
-        return libraryService.findLoansByBorrower(email).map { it.toInfo() }
+        val validatedEmail = ValidationUtils.validateEmail(email, "대출자 이메일")
+        logger.info("MCP Tool 호출: getMyLoans - email=$validatedEmail")
+        return libraryService.findLoansByBorrower(validatedEmail).map { it.toInfo() }
     }
 
     @Tool(

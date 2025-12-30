@@ -1,6 +1,7 @@
 package com.monkeys.product.service
 
 import com.monkeys.product.entity.*
+import com.monkeys.shared.util.ValidationUtils
 import org.slf4j.LoggerFactory
 import org.springframework.ai.tool.annotation.Tool
 import org.springframework.ai.tool.annotation.ToolParam
@@ -29,8 +30,9 @@ class ProductMcpService(
         @ToolParam(description = "검색할 상품명", required = true)
         name: String
     ): List<ProductInfo> {
-        logger.info("MCP Tool 호출: searchProducts - name=$name")
-        return productService.searchProducts(name).map { it.toInfo() }
+        val validatedName = ValidationUtils.requireNotBlank(name, "상품명")
+        logger.info("MCP Tool 호출: searchProducts - name=$validatedName")
+        return productService.searchProducts(validatedName).map { it.toInfo() }
     }
 
     @Tool(
@@ -41,8 +43,9 @@ class ProductMcpService(
         @ToolParam(description = "상품 SKU", required = true)
         sku: String
     ): ProductInfo? {
-        logger.info("MCP Tool 호출: getProductBySku - sku=$sku")
-        return productService.findProductBySku(sku)?.toInfo()
+        val validatedSku = ValidationUtils.requireNotBlank(sku, "SKU")
+        logger.info("MCP Tool 호출: getProductBySku - sku=$validatedSku")
+        return productService.findProductBySku(validatedSku)?.toInfo()
     }
 
     @Tool(
@@ -65,8 +68,9 @@ class ProductMcpService(
         @ToolParam(description = "브랜드명", required = true)
         brand: String
     ): List<ProductInfo> {
-        logger.info("MCP Tool 호출: getProductsByBrand - brand=$brand")
-        return productService.findProductsByBrand(brand).map { it.toInfo() }
+        val validatedBrand = ValidationUtils.requireNotBlank(brand, "브랜드명")
+        logger.info("MCP Tool 호출: getProductsByBrand - brand=$validatedBrand")
+        return productService.findProductsByBrand(validatedBrand).map { it.toInfo() }
     }
 
     @Tool(
@@ -79,6 +83,9 @@ class ProductMcpService(
         @ToolParam(description = "최대 가격", required = true)
         maxPrice: Double
     ): List<ProductInfo> {
+        ValidationUtils.requireNonNegative(minPrice.toInt(), "최소 가격")
+        ValidationUtils.requirePositive(maxPrice, "최대 가격")
+        ValidationUtils.validateRange(minPrice, maxPrice, "최소 가격", "최대 가격")
         logger.info("MCP Tool 호출: getProductsByPriceRange - minPrice=$minPrice, maxPrice=$maxPrice")
         return productService.findProductsByPriceRange(
             BigDecimal.valueOf(minPrice),
@@ -126,6 +133,8 @@ class ProductMcpService(
         @ToolParam(description = "추가할 수량", required = true)
         amount: Int
     ): InventoryResult {
+        ValidationUtils.requirePositive(productId, "상품 ID")
+        ValidationUtils.requirePositive(amount, "추가할 수량")
         logger.info("MCP Tool 호출: addStock - productId=$productId, amount=$amount")
 
         val inventory = productService.addStock(productId, amount)
@@ -155,6 +164,8 @@ class ProductMcpService(
         @ToolParam(description = "차감할 수량", required = true)
         amount: Int
     ): InventoryResult {
+        ValidationUtils.requirePositive(productId, "상품 ID")
+        ValidationUtils.requirePositive(amount, "차감할 수량")
         logger.info("MCP Tool 호출: removeStock - productId=$productId, amount=$amount")
 
         val inventory = productService.removeStock(productId, amount)
