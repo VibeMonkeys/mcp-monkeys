@@ -1,6 +1,11 @@
 ---
 name: test-writing-guide
-description: 테스트 작성 가이드. 테스트 코드 작성, 단위 테스트, 통합 테스트, Kotest 사용 시 적용. Kotest + Fixture Monkey 패턴.
+description: |
+  테스트 작성 가이드. 다음 상황에서 활성화:
+  - "테스트 작성", "테스트 추가", "단위 테스트", "통합 테스트"
+  - "Kotest", "BehaviorSpec", "Fixture Monkey"
+  - *Test.kt, *IntegrationTest.kt 파일 작성 시
+allowed-tools: Read, Edit, Write, Bash, Glob, Grep
 ---
 
 # 테스트 작성 가이드

@@ -1,6 +1,10 @@
 ---
 name: api-design-guide
-description: REST API 설계 가이드. API 엔드포인트 설계, 컨트롤러 작성, 응답 형식 정의 시 사용. 표준 응답 형식과 에러 처리 패턴.
+description: |
+  REST API 설계 가이드. 다음 상황에서 활성화:
+  - "API 만들어줘", "엔드포인트 추가", "컨트롤러 작성"
+  - "응답 형식", "에러 처리", "페이징 구현"
+  - ApiResponse, DTO, Request/Response 클래스 작성 시
 ---
 
 # API 설계 가이드

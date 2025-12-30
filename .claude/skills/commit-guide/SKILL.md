@@ -1,6 +1,11 @@
 ---
 name: commit-message-guide
-description: 커밋 메시지 작성 가이드. 커밋 메시지 작성, git commit, 변경사항 커밋 시 사용. 한글 커밋 메시지 형식과 prefix 규칙 적용.
+description: |
+  커밋 메시지 작성 가이드. 다음 상황에서 활성화:
+  - "커밋해줘", "git commit", "변경사항 저장"
+  - feat/fix/refactor/perf 타입 선택 시
+  - 한글 커밋 메시지 형식 적용
+allowed-tools: Bash
 ---
 
 # 커밋 메시지 가이드

@@ -1,6 +1,11 @@
 ---
 name: spring-ai-patterns-guide
-description: Spring AI 패턴 가이드. ChatClient 사용, ChatMemoryAdvisor 설정, MCP 도구 정의, AI 응답 처리 시 사용. Spring AI 2.0 기반 개발.
+description: |
+  Spring AI 2.0 패턴 가이드. 다음 상황에서 활성화:
+  - "ChatClient", "ChatMemory", "ToolCallbackProvider"
+  - "@Tool", "@ToolParam", "MCP 도구 정의"
+  - AI 응답 처리, 스트리밍, 세션 관리
+  - Vertex AI Gemini 설정
 ---
 
 # Spring AI 패턴 가이드

@@ -1,6 +1,11 @@
 ---
 name: mcp-server-development-guide
-description: MCP 서버 개발 가이드. 새 MCP 서버 생성, MCP 도구 추가, Entity/Repository/Service 구조 설계 시 사용. Spring AI 2.0 기반 MCP 서버 패턴 적용.
+description: |
+  MCP 서버 개발 가이드. 다음 상황에서 활성화:
+  - "새 MCP 서버", "MCP 모듈 추가", "MCP 도구 만들어줘"
+  - mcp-*-server 디렉토리 생성/수정 시
+  - McpService, ToolConfiguration 작성 시
+  - Entity/Repository/Service 구조 설계
 ---
 
 # MCP 서버 개발 가이드

@@ -1,6 +1,11 @@
 ---
 name: code-review-checklist
-description: 코드 리뷰 체크리스트. PR 리뷰, 코드 품질 확인, 코드 검토 요청 시 사용. 프로젝트 표준에 맞는 리뷰 수행.
+description: |
+  코드 리뷰 체크리스트. 다음 상황에서 활성화:
+  - "코드 리뷰해줘", "PR 검토", "코드 확인해줘"
+  - BigDecimal 금액 계산, Period 날짜 계산 검증
+  - ValidationUtils 사용 여부 확인
+  - N+1 쿼리, 트랜잭션 범위 검토
 allowed-tools: Read, Grep, Glob
 ---
 
