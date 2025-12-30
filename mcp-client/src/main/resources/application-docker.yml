@@ -1,0 +1,29 @@
+spring:
+  ai:
+    mcp:
+      client:
+        sse:
+          connections:
+            library-server:
+              url: http://mcp-library-server:8091
+            todo-server:
+              url: http://mcp-todo-server:8096
+            employee-server:
+              url: http://mcp-employee-server:8097
+            product-server:
+              url: http://mcp-product-server:8098
+
+mcp:
+  library:
+    url: http://mcp-library-server:8091
+  todo:
+    url: http://mcp-todo-server:8096
+  employee:
+    url: http://mcp-employee-server:8097
+  product:
+    url: http://mcp-product-server:8098
+
+logging:
+  level:
+    root: INFO
+    com.monkeys: INFO

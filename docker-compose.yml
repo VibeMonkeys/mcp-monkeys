@@ -1,0 +1,112 @@
+version: '3.8'
+
+services:
+  # MCP Library Server
+  mcp-library-server:
+    build:
+      context: .
+      dockerfile: mcp-library-server/Dockerfile
+    container_name: mcp-library-server
+    ports:
+      - "8091:8091"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8091/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - mcp-network
+
+  # MCP Todo Server
+  mcp-todo-server:
+    build:
+      context: .
+      dockerfile: mcp-todo-server/Dockerfile
+    container_name: mcp-todo-server
+    ports:
+      - "8096:8096"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8096/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - mcp-network
+
+  # MCP Employee Server
+  mcp-employee-server:
+    build:
+      context: .
+      dockerfile: mcp-employee-server/Dockerfile
+    container_name: mcp-employee-server
+    ports:
+      - "8097:8097"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8097/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - mcp-network
+
+  # MCP Product Server
+  mcp-product-server:
+    build:
+      context: .
+      dockerfile: mcp-product-server/Dockerfile
+    container_name: mcp-product-server
+    ports:
+      - "8098:8098"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8098/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - mcp-network
+
+  # MCP Client (Unified API Gateway)
+  mcp-client:
+    build:
+      context: .
+      dockerfile: mcp-client/Dockerfile
+    container_name: mcp-client
+    ports:
+      - "8090:8090"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT}
+      - GOOGLE_CLOUD_LOCATION=${GOOGLE_CLOUD_LOCATION:-asia-northeast1}
+    depends_on:
+      mcp-library-server:
+        condition: service_healthy
+      mcp-todo-server:
+        condition: service_healthy
+      mcp-employee-server:
+        condition: service_healthy
+      mcp-product-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8090/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - mcp-network
+
+networks:
+  mcp-network:
+    driver: bridge
