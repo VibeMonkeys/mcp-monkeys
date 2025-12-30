@@ -4,6 +4,7 @@ import jakarta.persistence.*
 import java.math.BigDecimal
 import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.Period
 
 enum class EmployeeStatus {
     ACTIVE,      // 재직 중
@@ -100,6 +101,6 @@ class Employee(
 
     fun getYearsOfService(): Int {
         val endDate = resignDate ?: LocalDate.now()
-        return endDate.year - hireDate.year
+        return Period.between(hireDate, endDate).years
     }
 }

@@ -92,7 +92,8 @@
       "WebFetch(domain:mvnrepository.com)",
       "Bash(cat:*)",
       "Bash(ls:*)",
-      "Bash(wc:*)"
+      "Bash(wc:*)",
+      "Bash(git branch:*)"
     ],
     "deny": [],
     "ask": []
