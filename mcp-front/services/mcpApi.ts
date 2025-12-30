@@ -9,10 +9,10 @@ export interface McpServerStatus {
 
 export interface McpHealthResponse {
   servers: {
-    weather: McpServerStatus;
-    news: McpServerStatus;
-    translate: McpServerStatus;
-    calendar: McpServerStatus;
+    library: McpServerStatus;
+    todo: McpServerStatus;
+    employee: McpServerStatus;
+    product: McpServerStatus;
   };
   overallStatus: string;
   timestamp: number;
@@ -24,10 +24,8 @@ export interface McpComprehensiveHealth {
     version: string;
     status: string;
   };
-  apiCredentials: Record<string, string>;
   mcpServers: Record<string, McpServerStatus>;
   overallHealth: string;
-  configurationInstructions: Record<string, string>;
   timestamp: number;
 }
 
@@ -51,79 +49,61 @@ export interface ChatResponse {
   timestamp: number;
 }
 
-class McpApiService {
-  private baseUrl = '';
-  
-  constructor() {
-    // Vite의 프록시 설정을 사용하므로 baseUrl은 빈 문자열
-  }
+export interface ToolInfo {
+  name: string;
+  description: string;
+}
 
+export interface ToolsResponse {
+  data: Record<string, ToolInfo[]>;
+  success: boolean;
+  message: string;
+}
+
+class McpApiService {
   // Health Check APIs
   async getServerHealth(): Promise<McpHealthResponse> {
     try {
-      // Return dummy data since backend health endpoints are having issues
-      return {
-        servers: {
-          weather: { status: 'UP', url: 'localhost:8090', responseTime: '10ms', circuitBreakerState: 'CLOSED' },
-          news: { status: 'UP', url: 'localhost:8091', responseTime: '15ms', circuitBreakerState: 'CLOSED' },
-          translate: { status: 'UP', url: 'localhost:8092', responseTime: '12ms', circuitBreakerState: 'CLOSED' },
-          calendar: { status: 'UP', url: 'localhost:8093', responseTime: '8ms', circuitBreakerState: 'CLOSED' }
-        },
-        overallStatus: 'UP',
-        timestamp: Date.now()
-      };
+      const response = await fetch('/api/health/mcp-servers');
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      return await response.json();
     } catch (error) {
       console.error('MCP 서버 헬스체크 오류:', error);
-      throw error;
+      // Fallback dummy data
+      return {
+        servers: {
+          library: { status: 'UNKNOWN', url: 'localhost:8091', responseTime: '-', circuitBreakerState: 'UNKNOWN' },
+          todo: { status: 'UNKNOWN', url: 'localhost:8096', responseTime: '-', circuitBreakerState: 'UNKNOWN' },
+          employee: { status: 'UNKNOWN', url: 'localhost:8097', responseTime: '-', circuitBreakerState: 'UNKNOWN' },
+          product: { status: 'UNKNOWN', url: 'localhost:8098', responseTime: '-', circuitBreakerState: 'UNKNOWN' }
+        },
+        overallStatus: 'UNKNOWN',
+        timestamp: Date.now()
+      };
     }
   }
 
   async getComprehensiveHealth(): Promise<McpComprehensiveHealth> {
     try {
-      // Return dummy data since backend health endpoints are having issues
-      return {
-        service: {
-          name: 'mcp-client',
-          version: '1.0.0',
-          status: 'UP'
-        },
-        apiCredentials: {
-          'OpenAI': '✅ 설정됨',
-          'Weather API': '✅ 설정됨',
-          'News API': '✅ 설정됨'
-        },
-        mcpServers: {
-          weather: { status: 'UP', url: 'localhost:8090', responseTime: '10ms', circuitBreakerState: 'CLOSED' },
-          news: { status: 'UP', url: 'localhost:8091', responseTime: '15ms', circuitBreakerState: 'CLOSED' },
-          translate: { status: 'UP', url: 'localhost:8092', responseTime: '12ms', circuitBreakerState: 'CLOSED' },
-          calendar: { status: 'UP', url: 'localhost:8093', responseTime: '8ms', circuitBreakerState: 'CLOSED' }
-        },
-        overallHealth: 'HEALTHY',
-        configurationInstructions: {},
-        timestamp: Date.now()
-      };
+      const response = await fetch('/api/health/comprehensive');
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      return await response.json();
     } catch (error) {
       console.error('종합 헬스체크 오류:', error);
-      throw error;
-    }
-  }
-
-  async getConfigStatus() {
-    try {
-      // Return dummy data since backend health endpoints are having issues
       return {
-        config: 'OK',
-        apis: {
-          weather: 'configured',
-          news: 'configured',
-          translate: 'configured',
-          calendar: 'configured'
+        service: {
+          name: 'unified-mcp-client',
+          version: '2.0.0',
+          status: 'UNKNOWN'
         },
-        status: 'UP'
+        mcpServers: {},
+        overallHealth: 'UNKNOWN',
+        timestamp: Date.now()
       };
-    } catch (error) {
-      console.error('설정 상태 확인 오류:', error);
-      throw error;
     }
   }
 
@@ -147,8 +127,7 @@ class McpApiService {
       }
 
       const result = await response.json();
-      
-      // 백엔드 응답 형식에 맞게 변환
+
       if (result.success && result.data) {
         return {
           response: result.data.response,
@@ -165,81 +144,18 @@ class McpApiService {
     }
   }
 
-  // MCP Tool APIs
-  async getWeather(city: string) {
-    return this.callTool('getWeather', { city });
-  }
-
-  async searchNews(query: string, category?: string) {
-    return this.callTool('searchNews', { query, category });
-  }
-
-  async getNewsHeadlines(country?: string, category?: string) {
-    return this.callTool('getNewsHeadlines', { country, category });
-  }
-
-  async translateText(text: string, targetLanguage: string, sourceLanguage?: string) {
-    return this.callTool('translateText', { text, targetLanguage, sourceLanguage });
-  }
-
-  async detectLanguage(text: string) {
-    return this.callTool('detectLanguage', { text });
-  }
-
-  async createCalendarEvent(title: string, date: string, startTime?: string, endTime?: string, description?: string) {
-    return this.callTool('createCalendarEvent', { title, date, startTime, endTime, description });
-  }
-
-  async getCalendarEvents(date: string) {
-    return this.callTool('getCalendarEvents', { date });
-  }
-
-  async updateCalendarEvent(eventId: string, updates: any) {
-    return this.callTool('updateCalendarEvent', { eventId, ...updates });
-  }
-
-  async deleteCalendarEvent(eventId: string) {
-    return this.callTool('deleteCalendarEvent', { eventId });
-  }
-
-  // Generic tool call method
-  private async callTool(toolName: string, parameters: Record<string, any>) {
-    try {
-      const response = await fetch('/api/tools/call', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          tool: toolName,
-          parameters
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error(`도구 호출 오류 (${toolName}):`, error);
-      throw error;
-    }
-  }
-
   // Connection test
   async testConnection(): Promise<boolean> {
     try {
-      // Always return true since we know the backend is running
-      // Backend health endpoints are having issues but main functionality works
-      return true;
+      const response = await fetch('/api/status');
+      return response.ok;
     } catch {
       return false;
     }
   }
 
-  // Get available tools
-  async getAvailableTools() {
+  // Get available tools (dynamic from backend)
+  async getAvailableTools(): Promise<ToolsResponse> {
     try {
       const response = await fetch('/api/tools');
       if (!response.ok) {
@@ -248,6 +164,35 @@ class McpApiService {
       return await response.json();
     } catch (error) {
       console.error('사용 가능한 도구 조회 오류:', error);
+      throw error;
+    }
+  }
+
+  // Get tools summary
+  async getToolsSummary(): Promise<Record<string, number>> {
+    try {
+      const response = await fetch('/api/tools/summary');
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      const result = await response.json();
+      return result.data || {};
+    } catch (error) {
+      console.error('도구 요약 조회 오류:', error);
+      return {};
+    }
+  }
+
+  // Get service status
+  async getServiceStatus() {
+    try {
+      const response = await fetch('/api/status');
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('서비스 상태 조회 오류:', error);
       throw error;
     }
   }

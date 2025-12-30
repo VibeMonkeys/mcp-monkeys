@@ -353,45 +353,45 @@ export function ChatInterface() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="pt-0 space-y-2">
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
+                  <Button
+                    variant="outline"
+                    size="sm"
                     className="w-full justify-start"
-                    onClick={() => handleSendMessage("서울 날씨 알려줘")}
+                    onClick={() => handleSendMessage("도서 검색해줘")}
                     disabled={connectionStatus !== 'connected'}
                   >
                     <Activity className="h-3 w-3 mr-2" />
-                    날씨 확인
+                    📚 도서 검색
                   </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
+                  <Button
+                    variant="outline"
+                    size="sm"
                     className="w-full justify-start"
-                    onClick={() => handleSendMessage("최신 뉴스 헤드라인 보여줘")}
+                    onClick={() => handleSendMessage("내 할일 목록 보여줘")}
                     disabled={connectionStatus !== 'connected'}
                   >
                     <Activity className="h-3 w-3 mr-2" />
-                    뉴스 확인
+                    ✅ 할일 목록
                   </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
+                  <Button
+                    variant="outline"
+                    size="sm"
                     className="w-full justify-start"
-                    onClick={() => handleSendMessage("Hello를 한국어로 번역해줘")}
+                    onClick={() => handleSendMessage("직원 검색해줘")}
                     disabled={connectionStatus !== 'connected'}
                   >
                     <Activity className="h-3 w-3 mr-2" />
-                    번역 테스트
+                    👥 직원 검색
                   </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
+                  <Button
+                    variant="outline"
+                    size="sm"
                     className="w-full justify-start"
-                    onClick={() => handleSendMessage("오늘 일정 확인해줘")}
+                    onClick={() => handleSendMessage("재고 부족 상품 확인해줘")}
                     disabled={connectionStatus !== 'connected'}
                   >
                     <Activity className="h-3 w-3 mr-2" />
-                    일정 확인
+                    📦 재고 확인
                   </Button>
                 </CardContent>
               </Card>

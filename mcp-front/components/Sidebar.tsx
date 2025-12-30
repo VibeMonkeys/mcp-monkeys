@@ -165,37 +165,6 @@ export function Sidebar({ isOpen, onToggle, onClearChat, serverHealth }: Sidebar
                 </div>
               )}
 
-              <Separator className="bg-slate-700/50" />
-
-              {/* Configuration Status */}
-              {serverHealth?.apiCredentials && (
-                <div className="p-4">
-                  <Card className="bg-slate-800/50 border-slate-600">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm text-slate-200 flex items-center gap-2">
-                        <Settings className="h-4 w-4" />
-                        API 설정
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-0">
-                      <div className="space-y-2">
-                        {Object.entries(serverHealth.apiCredentials).map(([api, status]) => (
-                          <div key={api} className="flex items-center justify-between text-xs">
-                            <span className="text-slate-400">{api}</span>
-                            <Badge 
-                              variant={status.includes('❌') ? 'destructive' : 'default'}
-                              className="text-xs"
-                            >
-                              {status.includes('❌') ? '미설정' : '설정됨'}
-                            </Badge>
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              )}
-
               {/* Navigation */}
               <div className="mt-auto p-4 space-y-2">
                 <Button 
