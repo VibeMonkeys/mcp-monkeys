@@ -161,24 +161,20 @@ class EmployeeService(
     // ===== Statistics =====
 
     fun getEmployeeStats(): EmployeeStats {
-        val employees = employeeRepository.findAll()
-        val active = employees.count { it.status == EmployeeStatus.ACTIVE }
-        val onLeave = employees.count { it.status == EmployeeStatus.ON_LEAVE }
-        val resigned = employees.count { it.status == EmployeeStatus.RESIGNED }
+        // 최적화: 개별 count 쿼리 사용 (전체 데이터 로드 대신)
+        val totalEmployees = employeeRepository.count()
+        val active = employeeRepository.countByStatus(EmployeeStatus.ACTIVE)
+        val onLeave = employeeRepository.countByStatus(EmployeeStatus.ON_LEAVE)
+        val resigned = employeeRepository.countByStatus(EmployeeStatus.RESIGNED)
         val departments = departmentRepository.count()
         val positions = positionRepository.count()
-        val avgSalary = employees.filter { it.status == EmployeeStatus.ACTIVE }
-            .map { it.salary }
-            .takeIf { it.isNotEmpty() }
-            ?.let { salaries ->
-                salaries.reduce { acc, salary -> acc + salary } / BigDecimal(salaries.size)
-            } ?: BigDecimal.ZERO
+        val avgSalary = employeeRepository.findAverageSalaryOfActiveEmployees() ?: BigDecimal.ZERO
 
         return EmployeeStats(
-            totalEmployees = employees.size,
-            activeEmployees = active,
-            onLeaveEmployees = onLeave,
-            resignedEmployees = resigned,
+            totalEmployees = totalEmployees.toInt(),
+            activeEmployees = active.toInt(),
+            onLeaveEmployees = onLeave.toInt(),
+            resignedEmployees = resigned.toInt(),
             totalDepartments = departments,
             totalPositions = positions,
             averageSalary = avgSalary

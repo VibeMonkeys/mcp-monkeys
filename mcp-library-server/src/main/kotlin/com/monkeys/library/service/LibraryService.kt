@@ -106,18 +106,22 @@ class LibraryService(
     // ===== Statistics =====
 
     fun getLibraryStats(): LibraryStats {
+        // 최적화: count 쿼리 사용 (전체 데이터 로드 대신)
         val totalBooks = bookRepository.count()
-        val availableBooks = bookRepository.findByStatus(BookStatus.AVAILABLE).size
-        val activeLoans = loanRepository.findByStatus(LoanStatus.ACTIVE).size
-        val overdueLoans = findOverdueLoans().size
+        val availableBooks = bookRepository.countByStatus(BookStatus.AVAILABLE)
+        val activeLoans = loanRepository.countByStatus(LoanStatus.ACTIVE)
+        val overdueLoans = loanRepository.countByDueDateBeforeAndStatus(
+            java.time.LocalDate.now(),
+            LoanStatus.ACTIVE
+        )
         val totalAuthors = authorRepository.count()
 
         return LibraryStats(
             totalBooks = totalBooks,
-            availableBooks = availableBooks,
+            availableBooks = availableBooks.toInt(),
             borrowedBooks = totalBooks - availableBooks,
-            activeLoans = activeLoans,
-            overdueLoans = overdueLoans,
+            activeLoans = activeLoans.toInt(),
+            overdueLoans = overdueLoans.toInt(),
             totalAuthors = totalAuthors
         )
     }

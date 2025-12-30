@@ -20,4 +20,7 @@ interface BookRepository : JpaRepository<Book, Long>, KotlinJdslJpqlExecutor {
     fun findByAuthorId(authorId: Long): List<Book>
 
     fun findByAuthorNameContainingIgnoreCase(name: String): List<Book>
+
+    // 통계용 count 쿼리
+    fun countByStatus(status: BookStatus): Long
 }

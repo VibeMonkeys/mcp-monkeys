@@ -26,4 +26,13 @@ interface ProductRepository : JpaRepository<Product, Long>, KotlinJdslJpqlExecut
 
     @Query("SELECT p FROM Product p JOIN p.inventory i WHERE i.quantity = 0 AND p.status != 'DISCONTINUED'")
     fun findOutOfStockProducts(): List<Product>
+
+    // 통계용 count 쿼리
+    fun countByStatus(status: ProductStatus): Long
+
+    @Query("SELECT COUNT(p) FROM Product p JOIN p.inventory i WHERE i.quantity <= i.reorderLevel AND p.status != 'DISCONTINUED'")
+    fun countLowStockProducts(): Long
+
+    @Query("SELECT SUM(p.price * i.quantity) FROM Product p JOIN p.inventory i WHERE p.status != 'DISCONTINUED'")
+    fun calculateTotalInventoryValue(): BigDecimal?
 }

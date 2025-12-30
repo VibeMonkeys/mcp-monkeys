@@ -19,4 +19,10 @@ interface EmployeeRepository : JpaRepository<Employee, Long>, KotlinJdslJpqlExec
 
     @Query("SELECT e FROM Employee e WHERE e.department.id = :departmentId AND e.status = :status")
     fun findByDepartmentIdAndStatus(departmentId: Long, status: EmployeeStatus): List<Employee>
+
+    // 통계용 count 쿼리
+    fun countByStatus(status: EmployeeStatus): Long
+
+    @Query("SELECT AVG(e.salary) FROM Employee e WHERE e.status = 'ACTIVE'")
+    fun findAverageSalaryOfActiveEmployees(): java.math.BigDecimal?
 }

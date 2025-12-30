@@ -21,4 +21,8 @@ interface LoanRepository : JpaRepository<Loan, Long>, KotlinJdslJpqlExecutor {
     fun findByBookIdAndStatus(bookId: Long, status: LoanStatus): List<Loan>
 
     fun findByDueDateBeforeAndStatus(date: LocalDate, status: LoanStatus): List<Loan>
+
+    // 통계용 count 쿼리
+    fun countByStatus(status: LoanStatus): Long
+    fun countByDueDateBeforeAndStatus(date: LocalDate, status: LoanStatus): Long
 }

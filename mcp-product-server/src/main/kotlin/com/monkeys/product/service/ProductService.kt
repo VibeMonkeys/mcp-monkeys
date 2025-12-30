@@ -177,27 +177,23 @@ class ProductService(
     // ===== Statistics =====
 
     fun getProductStats(): ProductStats {
-        val products = productRepository.findAll()
-        val active = products.count { it.status == ProductStatus.ACTIVE }
-        val inactive = products.count { it.status == ProductStatus.INACTIVE }
-        val outOfStock = products.count { it.status == ProductStatus.OUT_OF_STOCK }
-        val discontinued = products.count { it.status == ProductStatus.DISCONTINUED }
-        val lowStock = findLowStockProducts().size
+        // 최적화: count 쿼리 사용 (전체 데이터 로드 대신)
+        val totalProducts = productRepository.count()
+        val active = productRepository.countByStatus(ProductStatus.ACTIVE)
+        val inactive = productRepository.countByStatus(ProductStatus.INACTIVE)
+        val outOfStock = productRepository.countByStatus(ProductStatus.OUT_OF_STOCK)
+        val discontinued = productRepository.countByStatus(ProductStatus.DISCONTINUED)
+        val lowStock = productRepository.countLowStockProducts()
         val categories = categoryRepository.count()
-
-        val totalValue = products.filter { it.status != ProductStatus.DISCONTINUED }
-            .fold(BigDecimal.ZERO) { acc, product ->
-                val quantity = BigDecimal(product.inventory?.quantity ?: 0)
-                acc + (quantity * product.price)
-            }
+        val totalValue = productRepository.calculateTotalInventoryValue() ?: BigDecimal.ZERO
 
         return ProductStats(
-            totalProducts = products.size,
-            activeProducts = active,
-            inactiveProducts = inactive,
-            outOfStockProducts = outOfStock,
-            discontinuedProducts = discontinued,
-            lowStockProducts = lowStock,
+            totalProducts = totalProducts.toInt(),
+            activeProducts = active.toInt(),
+            inactiveProducts = inactive.toInt(),
+            outOfStockProducts = outOfStock.toInt(),
+            discontinuedProducts = discontinued.toInt(),
+            lowStockProducts = lowStock.toInt(),
             totalCategories = categories,
             totalInventoryValue = totalValue
         )
