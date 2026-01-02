@@ -1,6 +1,6 @@
 package com.monkeys.todo.config
 
-import com.monkeys.todo.service.TodoMcpService
+import com.monkeys.todo.adapter.`in`.mcp.TodoMcpAdapter
 import org.springframework.ai.tool.ToolCallbackProvider
 import org.springframework.ai.tool.method.MethodToolCallbackProvider
 import org.springframework.context.annotation.Bean
@@ -10,9 +10,9 @@ import org.springframework.context.annotation.Configuration
 class ToolConfiguration {
 
     @Bean
-    fun todoToolCallbackProvider(todoMcpService: TodoMcpService): ToolCallbackProvider {
+    fun todoToolCallbackProvider(todoMcpAdapter: TodoMcpAdapter): ToolCallbackProvider {
         return MethodToolCallbackProvider.builder()
-            .toolObjects(todoMcpService)
+            .toolObjects(todoMcpAdapter)
             .build()
     }
 }
