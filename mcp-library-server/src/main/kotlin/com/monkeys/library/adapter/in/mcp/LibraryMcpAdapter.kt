@@ -1,28 +1,24 @@
-package com.monkeys.library.service
+package com.monkeys.library.adapter.`in`.mcp
 
-import com.monkeys.library.entity.*
+import com.monkeys.library.adapter.`in`.mcp.dto.*
+import com.monkeys.library.application.port.`in`.*
+import com.monkeys.library.domain.model.LibraryStats
 import com.monkeys.shared.util.ValidationUtils
 import org.slf4j.LoggerFactory
 import org.springframework.ai.tool.annotation.Tool
 import org.springframework.ai.tool.annotation.ToolParam
-import org.springframework.stereotype.Service
-import org.springframework.transaction.annotation.Transactional
+import org.springframework.stereotype.Component
 
-/**
- * Library MCP Tool Provider
- * 도서관 시스템의 MCP 도구들을 제공합니다.
- *
- * Spring AI 2.0의 @Tool, @ToolParam 어노테이션을 사용합니다.
- * MCP 프로토콜을 통해 AI가 도서 검색, 대출, 반납 등의 작업을 수행할 수 있습니다.
- */
-@Service
-@Transactional(readOnly = true)
-class LibraryMcpService(
-    private val libraryService: LibraryService
+@Component
+class LibraryMcpAdapter(
+    private val bookUseCase: BookUseCase,
+    private val authorUseCase: AuthorUseCase,
+    private val loanUseCase: LoanUseCase,
+    private val libraryStatsUseCase: LibraryStatsUseCase
 ) {
-    private val logger = LoggerFactory.getLogger(LibraryMcpService::class.java)
+    private val logger = LoggerFactory.getLogger(LibraryMcpAdapter::class.java)
 
-    // ===== 도서 검색 도구 =====
+    // ===== Book Tools =====
 
     @Tool(
         name = "searchBooks",
@@ -34,7 +30,7 @@ class LibraryMcpService(
     ): List<BookInfo> {
         val validatedKeyword = ValidationUtils.requireNotBlank(keyword, "검색 키워드")
         logger.info("MCP Tool 호출: searchBooks - keyword=$validatedKeyword")
-        return libraryService.searchBooks(validatedKeyword).map { it.toInfo() }
+        return bookUseCase.searchBooks(validatedKeyword).map { BookInfo.from(it) }
     }
 
     @Tool(
@@ -46,7 +42,7 @@ class LibraryMcpService(
         isbn: String
     ): BookInfo? {
         logger.info("MCP Tool 호출: findBookByIsbn - isbn=$isbn")
-        return libraryService.findBookByIsbn(isbn)?.toInfo()
+        return bookUseCase.findBookByIsbn(isbn)?.let { BookInfo.from(it) }
     }
 
     @Tool(
@@ -58,7 +54,7 @@ class LibraryMcpService(
         category: String
     ): List<BookInfo> {
         logger.info("MCP Tool 호출: findBooksByCategory - category=$category")
-        return libraryService.findBooksByCategory(category).map { it.toInfo() }
+        return bookUseCase.findBooksByCategory(category).map { BookInfo.from(it) }
     }
 
     @Tool(
@@ -70,7 +66,7 @@ class LibraryMcpService(
         authorName: String
     ): List<BookInfo> {
         logger.info("MCP Tool 호출: findBooksByAuthor - authorName=$authorName")
-        return libraryService.findBooksByAuthor(authorName).map { it.toInfo() }
+        return bookUseCase.findBooksByAuthor(authorName).map { BookInfo.from(it) }
     }
 
     @Tool(
@@ -79,10 +75,10 @@ class LibraryMcpService(
     )
     fun getAvailableBooks(): List<BookInfo> {
         logger.info("MCP Tool 호출: getAvailableBooks")
-        return libraryService.findAvailableBooks().map { it.toInfo() }
+        return bookUseCase.findAvailableBooks().map { BookInfo.from(it) }
     }
 
-    // ===== 저자 검색 도구 =====
+    // ===== Author Tools =====
 
     @Tool(
         name = "searchAuthors",
@@ -93,10 +89,10 @@ class LibraryMcpService(
         name: String
     ): List<AuthorInfo> {
         logger.info("MCP Tool 호출: searchAuthors - name=$name")
-        return libraryService.searchAuthors(name).map { it.toInfo() }
+        return authorUseCase.searchAuthors(name).map { AuthorInfo.from(it) }
     }
 
-    // ===== 대출 관리 도구 =====
+    // ===== Loan Tools =====
 
     @Tool(
         name = "borrowBook",
@@ -115,15 +111,15 @@ class LibraryMcpService(
         val validatedEmail = ValidationUtils.validateEmail(borrowerEmail, "대출자 이메일")
         logger.info("MCP Tool 호출: borrowBook - bookId=$bookId, borrower=$validatedName")
 
-        val loan = libraryService.borrowBook(bookId, validatedName, validatedEmail)
+        val loan = loanUseCase.borrowBook(bookId, validatedName, validatedEmail)
         return if (loan != null) {
             LoanResult(
                 success = true,
                 message = "도서 대출이 완료되었습니다.",
-                loanInfo = loan.toInfo()
+                loanInfo = LoanInfo.from(loan)
             )
         } else {
-            val book = libraryService.findBookById(bookId)
+            val book = bookUseCase.findBookById(bookId)
             LoanResult(
                 success = false,
                 message = if (book == null) "도서를 찾을 수 없습니다." else "현재 대출 가능한 도서가 없습니다.",
@@ -142,12 +138,12 @@ class LibraryMcpService(
     ): LoanResult {
         logger.info("MCP Tool 호출: returnBook - loanId=$loanId")
 
-        val loan = libraryService.returnBook(loanId)
+        val loan = loanUseCase.returnBook(loanId)
         return if (loan != null) {
             LoanResult(
                 success = true,
                 message = "도서 반납이 완료되었습니다.",
-                loanInfo = loan.toInfo()
+                loanInfo = LoanInfo.from(loan)
             )
         } else {
             LoanResult(
@@ -170,12 +166,12 @@ class LibraryMcpService(
     ): LoanResult {
         logger.info("MCP Tool 호출: extendLoan - loanId=$loanId, days=$days")
 
-        val loan = libraryService.extendLoan(loanId, days)
+        val loan = loanUseCase.extendLoan(loanId, days)
         return if (loan != null) {
             LoanResult(
                 success = true,
                 message = "대출 기간이 ${days}일 연장되었습니다. 새로운 반납일: ${loan.dueDate}",
-                loanInfo = loan.toInfo()
+                loanInfo = LoanInfo.from(loan)
             )
         } else {
             LoanResult(
@@ -196,7 +192,7 @@ class LibraryMcpService(
     ): List<LoanInfo> {
         val validatedEmail = ValidationUtils.validateEmail(email, "대출자 이메일")
         logger.info("MCP Tool 호출: getMyLoans - email=$validatedEmail")
-        return libraryService.findLoansByBorrower(validatedEmail).map { it.toInfo() }
+        return loanUseCase.findLoansByBorrower(validatedEmail).map { LoanInfo.from(it) }
     }
 
     @Tool(
@@ -205,10 +201,10 @@ class LibraryMcpService(
     )
     fun getOverdueLoans(): List<LoanInfo> {
         logger.info("MCP Tool 호출: getOverdueLoans")
-        return libraryService.findOverdueLoans().map { it.toInfo() }
+        return loanUseCase.findOverdueLoans().map { LoanInfo.from(it) }
     }
 
-    // ===== 통계 도구 =====
+    // ===== Stats Tools =====
 
     @Tool(
         name = "getLibraryStats",
@@ -216,84 +212,6 @@ class LibraryMcpService(
     )
     fun getLibraryStats(): LibraryStats {
         logger.info("MCP Tool 호출: getLibraryStats")
-        return libraryService.getLibraryStats()
+        return libraryStatsUseCase.getLibraryStats()
     }
 }
-
-// ===== DTO =====
-
-data class BookInfo(
-    val id: Long,
-    val title: String,
-    val isbn: String,
-    val authorName: String,
-    val publisher: String?,
-    val category: String?,
-    val description: String?,
-    val availableCopies: Int,
-    val totalCopies: Int,
-    val status: String
-)
-
-data class AuthorInfo(
-    val id: Long,
-    val name: String,
-    val nationality: String?,
-    val biography: String?,
-    val bookCount: Int
-)
-
-data class LoanInfo(
-    val id: Long,
-    val bookTitle: String,
-    val bookIsbn: String,
-    val borrowerName: String,
-    val borrowerEmail: String,
-    val loanDate: String,
-    val dueDate: String,
-    val returnDate: String?,
-    val status: String,
-    val isOverdue: Boolean
-)
-
-data class LoanResult(
-    val success: Boolean,
-    val message: String,
-    val loanInfo: LoanInfo?
-)
-
-// ===== Extension Functions =====
-
-private fun Book.toInfo() = BookInfo(
-    id = id,
-    title = title,
-    isbn = isbn,
-    authorName = author.name,
-    publisher = publisher,
-    category = category,
-    description = description,
-    availableCopies = availableCopies,
-    totalCopies = totalCopies,
-    status = status.name
-)
-
-private fun Author.toInfo() = AuthorInfo(
-    id = id,
-    name = name,
-    nationality = nationality,
-    biography = biography,
-    bookCount = books.size
-)
-
-private fun Loan.toInfo() = LoanInfo(
-    id = id,
-    bookTitle = book.title,
-    bookIsbn = book.isbn,
-    borrowerName = borrowerName,
-    borrowerEmail = borrowerEmail,
-    loanDate = loanDate.toString(),
-    dueDate = dueDate.toString(),
-    returnDate = returnDate?.toString(),
-    status = status.name,
-    isOverdue = isOverdue()
-)

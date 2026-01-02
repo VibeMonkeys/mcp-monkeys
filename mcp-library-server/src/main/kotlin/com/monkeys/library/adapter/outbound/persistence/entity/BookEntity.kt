@@ -1,11 +1,13 @@
-package com.monkeys.library.entity
+package com.monkeys.library.adapter.outbound.persistence.entity
 
+import com.monkeys.library.domain.model.Book
+import com.monkeys.library.domain.model.BookStatus
 import jakarta.persistence.*
 import java.time.LocalDate
 
 @Entity
 @Table(name = "books")
-class Book(
+class BookEntity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     val id: Long = 0,
@@ -18,7 +20,7 @@ class Book(
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "author_id", nullable = false)
-    var author: Author,
+    var author: AuthorEntity,
 
     @Column(length = 100)
     var publisher: String? = null,
@@ -43,37 +45,31 @@ class Book(
     var status: BookStatus = BookStatus.AVAILABLE,
 
     @OneToMany(mappedBy = "book", cascade = [CascadeType.ALL], fetch = FetchType.LAZY)
-    val loans: MutableList<Loan> = mutableListOf()
+    val loans: MutableList<LoanEntity> = mutableListOf()
 ) {
-    fun isAvailable(): Boolean = availableCopies > 0 && status == BookStatus.AVAILABLE
+    fun toDomain() = Book(
+        id = id,
+        title = title,
+        isbn = isbn,
+        author = author.toDomain(),
+        publisher = publisher,
+        publishedDate = publishedDate,
+        category = category,
+        description = description,
+        totalCopies = totalCopies,
+        availableCopies = availableCopies,
+        status = status
+    )
 
-    fun borrow(): Boolean {
-        if (!isAvailable()) return false
-        availableCopies--
-        if (availableCopies == 0) {
-            status = BookStatus.ALL_BORROWED
-        }
-        return true
+    fun updateFrom(book: Book) {
+        this.title = book.title
+        this.isbn = book.isbn
+        this.publisher = book.publisher
+        this.publishedDate = book.publishedDate
+        this.category = book.category
+        this.description = book.description
+        this.totalCopies = book.totalCopies
+        this.availableCopies = book.availableCopies
+        this.status = book.status
     }
-
-    fun returnBook() {
-        availableCopies++
-        if (availableCopies > 0) {
-            status = BookStatus.AVAILABLE
-        }
-    }
-
-    override fun equals(other: Any?): Boolean {
-        if (this === other) return true
-        if (other !is Book) return false
-        return id == other.id
-    }
-
-    override fun hashCode(): Int = id.hashCode()
-}
-
-enum class BookStatus {
-    AVAILABLE,      // 대출 가능
-    ALL_BORROWED,   // 전부 대출 중
-    UNAVAILABLE     // 대출 불가 (분실, 폐기 등)
 }
