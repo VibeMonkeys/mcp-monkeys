@@ -94,7 +94,12 @@
       "Bash(ls:*)",
       "Bash(wc:*)",
       "Bash(git branch:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(/Users/jinan/vibe/project/mcp-monkeys/mcp-library-server/src/test/kotlin/com/monkeys/library/service/LibraryMcpServiceTest.kt )",
+      "Bash(/Users/jinan/vibe/project/mcp-monkeys/mcp-library-server/src/test/kotlin/com/monkeys/library/service/LibraryServiceTest.kt )",
+      "Bash(/Users/jinan/vibe/project/mcp-monkeys/mcp-product-server/src/test/kotlin/com/monkeys/product/service/ProductServiceTest.kt )",
+      "Bash(/Users/jinan/vibe/project/mcp-monkeys/mcp-todo-server/src/test/kotlin/com/monkeys/todo/service/TodoMcpServiceTest.kt )",
+      "Bash(/Users/jinan/vibe/project/mcp-monkeys/mcp-todo-server/src/test/kotlin/com/monkeys/todo/service/TodoServiceTest.kt)"
     ],
     "deny": [],
     "ask": []
